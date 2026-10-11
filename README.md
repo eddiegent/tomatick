@@ -2,7 +2,7 @@
 
 A free, open source Pomodoro timer for Windows, macOS and Linux, built around a small always-on-top tomato widget.
 
-> **Status: specification phase.** There is no released version yet. The design is written down in [SPEC.md](SPEC.md) and the code is about to start.
+> **Status: early development.** There is no released version yet. The design is written down in [SPEC.md](SPEC.md), and the project skeleton (Tauri, React, CI) is in place. The widget and timer engine are next.
 
 ## What it is
 
@@ -44,11 +44,30 @@ The full specification is in [SPEC.md](SPEC.md). It covers the timer behavior, a
 
 A documentation website is planned in the `website` folder and will be published with GitHub Pages.
 
+## Development
+
+Prerequisites:
+
+- [Node.js](https://nodejs.org) 22 or later
+- [Rust](https://rustup.rs) (stable)
+- The [Tauri system dependencies](https://tauri.app/start/prerequisites/) for your platform (on Linux this includes WebKitGTK 4.1)
+
+Commands:
+
+```
+npm install            # install frontend dependencies
+npm run tauri dev      # run the app in development mode
+npm run build          # type-check and build the frontend
+npm run tauri build    # build installers for your platform
+```
+
+Continuous integration builds the app on Windows, macOS and Linux for every push to `main` and every pull request.
+
 ## Contributing
 
-The project is not ready for code contributions yet, but feedback on the specification is welcome. Open an issue to discuss a change or a question about the design.
+The app does not do anything useful yet, so code contributions are premature, but feedback on the specification is welcome. Open an issue to discuss a change or a question about the design.
 
-Once the first milestone lands, this section will describe how to build and run the app and how to add a translation.
+Once the timer engine and widget land, this section will describe how to add a translation.
 
 ## License
 
