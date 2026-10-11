@@ -2,7 +2,7 @@
 
 A free, open source Pomodoro timer for Windows, macOS and Linux, built around a small always-on-top tomato widget.
 
-> **Status: early development.** There is no released version yet. The design is written down in [SPEC.md](SPEC.md), and the project skeleton (Tauri, React, CI) is in place. The widget and timer engine are next.
+> **Status: early development.** There is no released version yet. The design is written down in [SPEC.md](SPEC.md), and the project skeleton (Tauri, React, CI) and the timer engine are in place. The tomato widget is next.
 
 ## What it is
 
@@ -59,6 +59,12 @@ npm install            # install frontend dependencies
 npm run tauri dev      # run the app in development mode
 npm run build          # type-check and build the frontend
 npm run tauri build    # build installers for your platform
+```
+
+The timer engine (`src-tauri/src/engine`) is plain Rust with no dependency on Tauri, and its unit tests run with:
+
+```
+cargo test --manifest-path src-tauri/Cargo.toml
 ```
 
 Continuous integration builds the app on Windows, macOS and Linux for every push to `main` and every pull request.
