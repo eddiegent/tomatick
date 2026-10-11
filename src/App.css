@@ -1,49 +1,17 @@
-:root {
-  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  color: #1f1f1f;
-  background-color: #fafafa;
-}
+/* The widget window is transparent: nothing here may paint a background. */
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    color: #f0f0f0;
-    background-color: #1c1c1c;
-  }
+html,
+body,
+#root {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+  background: transparent;
 }
 
 body {
-  margin: 0;
-}
-
-.placeholder {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  min-height: 100vh;
-  text-align: center;
-}
-
-.phase {
-  margin: 0;
-  text-transform: capitalize;
-  opacity: 0.7;
-}
-
-.clock {
-  margin: 0.2em 0;
-  font-size: 4rem;
-  font-variant-numeric: tabular-nums;
-}
-
-.detail {
-  margin: 0 0 1rem;
-  min-height: 1.5em;
-  text-transform: capitalize;
-  opacity: 0.7;
-}
-
-.controls {
-  display: flex;
-  gap: 0.5rem;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  user-select: none;
+  -webkit-user-select: none;
 }
