@@ -128,10 +128,14 @@
 }
 
 .widget:hover .cycle,
-.widget:hover .label,
-.widget:focus-within .cycle,
-.widget:focus-within .label {
+.widget:focus-within .cycle {
   opacity: 0.12;
+}
+
+/* The break exercise stays readable while the menu icons show. */
+.widget:hover .label,
+.widget:focus-within .label {
+  opacity: 0.25;
 }
 
 /* ----- countdown editing ----- */
