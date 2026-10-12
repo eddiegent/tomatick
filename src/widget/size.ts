@@ -1,8 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { LogicalSize } from "@tauri-apps/api/dpi";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-
-export type WidgetSize = "small" | "medium" | "large";
+import type { WidgetSize } from "../settings/api";
 
 /** Window edge length in logical pixels. The tomato fills the window. */
 export const WIDGET_PIXELS: Record<WidgetSize, number> = {
@@ -11,26 +10,8 @@ export const WIDGET_PIXELS: Record<WidgetSize, number> = {
   large: 280,
 };
 
-// Temporary storage until the settings dialog and database exist
-// (milestone 4).
-const STORAGE_KEY = "tomatick.widgetSize";
-
-function load(): WidgetSize {
-  try {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored === "small" || stored === "medium" || stored === "large") {
-      return stored;
-    }
-  } catch {
-    // Storage can be unavailable; fall back to the default.
-  }
-  return "medium";
-}
-
-/** The widget size, applied to the window whenever it changes. */
-export function useWidgetSize(): [WidgetSize, (size: WidgetSize) => void] {
-  const [size, setSize] = useState<WidgetSize>(load);
-
+/** Resizes the widget window whenever the size setting changes. */
+export function useApplyWidgetSize(size: WidgetSize): void {
   useEffect(() => {
     const pixels = WIDGET_PIXELS[size];
     try {
@@ -40,12 +21,5 @@ export function useWidgetSize(): [WidgetSize, (size: WidgetSize) => void] {
     } catch {
       // Not running inside Tauri (for example a plain browser).
     }
-    try {
-      localStorage.setItem(STORAGE_KEY, size);
-    } catch {
-      // Ignore storage failures.
-    }
   }, [size]);
-
-  return [size, setSize];
 }

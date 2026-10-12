@@ -1,6 +1,8 @@
-import { useEffect, type CSSProperties } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 import "./widget.css";
 import { engine, formatClock, useSnapshot, type Snapshot } from "../engine/api";
+import { formatDuration, parseDuration } from "../engine/duration";
+import { settingsApi, useSettings } from "../settings/api";
 import {
   ChartIcon,
   CogIcon,
@@ -11,7 +13,7 @@ import {
   SkipIcon,
   SwapIcon,
 } from "./icons";
-import { WIDGET_PIXELS, useWidgetSize, type WidgetSize } from "./size";
+import { WIDGET_PIXELS, useApplyWidgetSize } from "./size";
 import { Tomato } from "./Tomato";
 import { progressOf, themeOf, type Theme } from "./theme";
 
@@ -32,16 +34,16 @@ const TEXT = {
   toCountdown: "Switch to countdown",
   toPomodoro: "Switch to Pomodoro",
   stats: "Statistics (coming soon)",
-  settings: "Settings (coming soon)",
+  settings: "Settings",
+  setCountdown: "Click to set the countdown",
+  countdownInput: "Countdown duration",
+  countdownHint: "Minutes, or m:ss. Enter to set, Escape to cancel.",
   paused: "Paused",
   autoPaused: "Paused by the system",
 };
 
-const SIZE_KEYS: Record<string, WidgetSize> = {
-  "1": "small",
-  "2": "medium",
-  "3": "large",
-};
+/** Quick choices for the countdown, in seconds. */
+const COUNTDOWN_PRESETS = [5 * 60, 10 * 60, 15 * 60, 30 * 60];
 
 function playLabel(snapshot: Snapshot): string {
   switch (snapshot.state) {
@@ -57,23 +59,48 @@ function playLabel(snapshot: Snapshot): string {
 /** The always-on-top tomato. */
 export function Widget() {
   const snapshot = useSnapshot();
-  const [size, setSize] = useWidgetSize();
+  const settings = useSettings();
+  const size = settings?.settings.widget_size ?? "medium";
+  useApplyWidgetSize(size);
 
-  // Temporary shortcut to try the three sizes: press 1, 2 or 3. It goes away
-  // when the settings dialog lands (milestone 4).
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState("");
+  const [invalid, setInvalid] = useState(false);
+  const input = useRef<HTMLInputElement>(null);
+
+  // The duration can only be edited while the countdown is idle.
+  const editable = snapshot?.mode === "countdown" && snapshot.state === "idle";
   useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.ctrlKey || event.metaKey || event.altKey) {
-        return;
-      }
-      const next = SIZE_KEYS[event.key];
-      if (next) {
-        setSize(next);
-      }
-    };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [setSize]);
+    if (!editable) {
+      setEditing(false);
+    }
+  }, [editable]);
+  useEffect(() => {
+    if (editing) {
+      input.current?.focus();
+      input.current?.select();
+    }
+  }, [editing]);
+
+  const beginEdit = () => {
+    if (!snapshot) {
+      return;
+    }
+    setDraft(formatDuration(Math.round(snapshot.total_ms / 1000)));
+    setInvalid(false);
+    setEditing(true);
+  };
+
+  const applyCountdown = (seconds: number | null) => {
+    if (seconds === null) {
+      setInvalid(true);
+      return;
+    }
+    engine
+      .setCountdown(seconds)
+      .then(() => setEditing(false))
+      .catch(() => setInvalid(true));
+  };
 
   // The browser context menu does not belong on a desktop widget.
   useEffect(() => {
@@ -82,7 +109,7 @@ export function Widget() {
     return () => window.removeEventListener("contextmenu", block);
   }, []);
 
-  if (!snapshot) {
+  if (!snapshot || !settings) {
     return null;
   }
 
@@ -102,7 +129,7 @@ export function Widget() {
 
   return (
     <div
-      className="widget"
+      className={editing ? "widget editing" : "widget"}
       data-theme={theme}
       data-state={snapshot.state}
       data-size={size}
@@ -115,7 +142,9 @@ export function Widget() {
             {snapshot.cycle.position}/{snapshot.cycle.length}
           </span>
         )}
-        <span className={time.length > 5 ? "time long" : "time"}>{time}</span>
+        {!editing && (
+          <span className={time.length > 5 ? "time long" : "time"}>{time}</span>
+        )}
         {snapshot.label && <span className="label">{snapshot.label}</span>}
         {paused && (
           <span className="paused-mark">
@@ -123,6 +152,56 @@ export function Widget() {
           </span>
         )}
       </div>
+
+      {editable && !editing && (
+        <button
+          type="button"
+          className="time-edit"
+          aria-label={TEXT.setCountdown}
+          title={TEXT.setCountdown}
+          onClick={beginEdit}
+        />
+      )}
+      {editing && (
+        <>
+          <input
+            ref={input}
+            className={invalid ? "time-input invalid" : "time-input"}
+            value={draft}
+            inputMode="numeric"
+            maxLength={8}
+            aria-label={TEXT.countdownInput}
+            aria-invalid={invalid}
+            title={TEXT.countdownHint}
+            onChange={(event) => {
+              setDraft(event.target.value);
+              setInvalid(false);
+            }}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") {
+                applyCountdown(parseDuration(draft));
+              } else if (event.key === "Escape") {
+                setEditing(false);
+              }
+            }}
+            onBlur={() => setEditing(false)}
+          />
+          <div className="presets">
+            {COUNTDOWN_PRESETS.map((seconds) => (
+              <button
+                key={seconds}
+                type="button"
+                className="preset"
+                // Keep the focus in the input so it does not close first.
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={() => applyCountdown(seconds)}
+              >
+                {seconds / 60}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
 
       <div className="controls top">
         <button
@@ -142,7 +221,7 @@ export function Widget() {
           className="ctl"
           aria-label={TEXT.settings}
           title={TEXT.settings}
-          disabled
+          onClick={() => settingsApi.open()}
         >
           <CogIcon />
         </button>
