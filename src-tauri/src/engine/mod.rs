@@ -20,6 +20,7 @@ pub use clock::{Clock, SystemClock};
 pub use exercises::{Exercise, Rotation};
 pub use machine::Engine;
 pub use segments::segment_lengths_secs;
+pub(crate) use settings::check_range;
 pub use settings::{
     COUNTDOWN_SECS_RANGE, DEFAULT_COUNTDOWN_SECS, EngineError, LONG_BREAK_SECS_RANGE,
     SESSIONS_RANGE, SHORT_BREAK_SECS_RANGE, SleepBehavior, TimerSettings, WORK_SECS_RANGE,

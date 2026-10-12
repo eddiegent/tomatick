@@ -134,6 +134,89 @@
   opacity: 0.12;
 }
 
+/* ----- countdown editing ----- */
+
+.time-edit,
+.time-input {
+  position: absolute;
+  left: 50%;
+  top: 54%;
+  transform: translate(-50%, -50%);
+}
+
+.time-edit {
+  width: 64%;
+  height: 22%;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  cursor: text;
+}
+
+.time-edit:hover,
+.time-edit:focus-visible {
+  background: rgba(0, 0, 0, 0.2);
+  outline: none;
+}
+
+.time-input {
+  box-sizing: border-box;
+  width: 58%;
+  padding: 0 4px;
+  border: 2px solid rgba(255, 255, 255, 0.9);
+  border-radius: 8px;
+  color: #ffffff;
+  background: rgba(0, 0, 0, 0.5);
+  font: inherit;
+  font-size: calc(var(--size) * 0.17);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+.time-input.invalid {
+  border-color: #ffd0d0;
+  background: rgba(120, 0, 0, 0.7);
+}
+
+.time-input:focus {
+  outline: none;
+}
+
+.presets {
+  position: absolute;
+  left: 50%;
+  top: 74%;
+  display: flex;
+  gap: calc(var(--size) * 0.02);
+  transform: translate(-50%, -50%);
+}
+
+.preset {
+  min-width: var(--btn);
+  height: var(--btn);
+  padding: 0 4px;
+  border: 0;
+  border-radius: 999px;
+  color: #ffffff;
+  background: rgba(0, 0, 0, 0.45);
+  font-size: calc(var(--size) * 0.06);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.preset:hover {
+  background: rgba(0, 0, 0, 0.65);
+}
+
+.widget.editing:hover .controls,
+.widget.editing:focus-within .controls,
+.widget.editing .controls {
+  opacity: 0;
+  pointer-events: none;
+}
+
 /* ----- paused ----- */
 
 .widget[data-state="paused"] .tomato,
