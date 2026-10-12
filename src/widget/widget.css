@@ -127,13 +127,11 @@
   display: none;
 }
 
+/* The cycle counter and the break exercise stay readable while the menu
+   icons show. */
 .widget:hover .cycle,
-.widget:focus-within .cycle {
-  opacity: 0.12;
-}
-
-/* The break exercise stays readable while the menu icons show. */
 .widget:hover .label,
+.widget:focus-within .cycle,
 .widget:focus-within .label {
   opacity: 0.4;
 }
