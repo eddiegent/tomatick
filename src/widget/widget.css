@@ -106,7 +106,7 @@
 }
 
 .cycle {
-  top: 39%;
+  top: 41.5%;
   font-size: calc(var(--size) * 0.065);
   font-weight: 600;
   opacity: 0.85;
