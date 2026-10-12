@@ -1,9 +1,19 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import "./settings.css";
-import type { Exercise, SleepBehavior, TimerSettings } from "../engine/api";
+import { playSound } from "../alerts/sound";
+import type { AlertEvent, Exercise, SleepBehavior, TimerSettings } from "../engine/api";
 import { formatDuration, parseDuration } from "../engine/duration";
-import { settingsApi, type AppSettings, type WidgetSize } from "./api";
+import {
+  settingsApi,
+  soundApi,
+  type AlertSettings,
+  type AppSettings,
+  type BuiltinSound,
+  type EventAlerts,
+  type SoundChoice,
+  type WidgetSize,
+} from "./api";
 
 // English only for now. The text moves to the translation files in
 // milestone 10.
@@ -25,6 +35,22 @@ const TEXT = {
   countdown: "Countdown timer",
   countdownStart: "Starting value",
   countdownHelp: "Minutes, or m:ss (for example 10 or 1:30).",
+  alerts: "Alerts",
+  alertsHelp:
+    "What happens when a phase ends. Sounds play through the app, independent of the system volume.",
+  volume: "Volume",
+  mute: "Mute all alert sounds",
+  notification: "System notification",
+  bringToFront: "Bring the widget to the front",
+  sound: "Sound",
+  builtinSounds: "Built-in",
+  yourSounds: "Your files",
+  test: "Test",
+  testHint: "Play this sound",
+  testMuted: "Unmute to test",
+  addFile: "Add a file",
+  addFileHint: "Use your own MP3, WAV or OGG file",
+  soundFailed: "This sound cannot be played: ",
   exercises: "Break exercises",
   exercisesHelp:
     "The app goes through this list in order, one entry per short break. A long break is split into several short ones and uses the list the same way.",
@@ -40,6 +66,30 @@ const TEXT = {
   save: "Save",
   saving: "Saving",
 };
+
+const ALERT_EVENTS: { key: AlertEvent; label: string }[] = [
+  { key: "work_end", label: "Work ends (a break starts)" },
+  { key: "short_break_end", label: "Short break ends" },
+  { key: "long_break_end", label: "Long break ends" },
+  { key: "countdown_end", label: "Countdown ends" },
+];
+
+const BUILTIN_SOUND_LABELS: Record<BuiltinSound, string> = {
+  chime: "Soft chime",
+  bell: "Bell",
+  beep: "Gentle beep",
+  marimba: "Marimba",
+};
+
+const soundKey = (choice: SoundChoice) => `${choice.kind}:${choice.value}`;
+
+function soundFromKey(key: string): SoundChoice {
+  const split = key.indexOf(":");
+  const value = key.slice(split + 1);
+  return key.slice(0, split) === "custom"
+    ? { kind: "custom", value }
+    : { kind: "builtin", value: value as BuiltinSound };
+}
 
 const LIMITS = {
   work: [1, 180],
@@ -58,6 +108,7 @@ interface Form {
   sleep: SleepBehavior;
   size: WidgetSize;
   countdown: string;
+  alerts: AlertSettings;
   exercises: Exercise[];
 }
 
@@ -66,6 +117,7 @@ function toForm(settings: AppSettings, exercises: Exercise[]): Form {
     ...timerToForm(settings.timer),
     size: settings.widget_size,
     countdown: formatDuration(settings.countdown_secs),
+    alerts: settings.alerts,
     exercises,
   };
 }
@@ -125,6 +177,7 @@ function fromForm(form: Form): { settings: AppSettings } | { error: string } {
       },
       widget_size: form.size,
       countdown_secs: countdown,
+      alerts: form.alerts,
     },
   };
 }
@@ -193,6 +246,41 @@ export function SettingsDialog() {
     [next[index], next[target]] = [next[target], next[index]];
     change({ exercises: next });
   };
+
+  const editEvent = (key: AlertEvent, patch: Partial<EventAlerts>) =>
+    change({
+      alerts: { ...form.alerts, [key]: { ...form.alerts[key], ...patch } },
+    });
+
+  const editAlerts = (patch: Partial<Pick<AlertSettings, "volume" | "muted">>) =>
+    change({ alerts: { ...form.alerts, ...patch } });
+
+  const testSound = (key: AlertEvent) => {
+    playSound(form.alerts[key].sound, form.alerts.volume).catch((e) =>
+      setError(`${TEXT.soundFailed}${String(e)}`),
+    );
+  };
+
+  const addSound = async (key: AlertEvent) => {
+    try {
+      const file = await soundApi.add();
+      if (file) {
+        editEvent(key, { sound: { kind: "custom", value: file }, sound_enabled: true });
+      }
+    } catch (e) {
+      setError(String(e));
+    }
+  };
+
+  // The custom files that an event uses. They are offered to every event.
+  const customSounds = [
+    ...new Set(
+      ALERT_EVENTS.flatMap(({ key }) => {
+        const { sound } = form.alerts[key];
+        return sound.kind === "custom" ? [sound.value] : [];
+      }),
+    ),
+  ];
 
   const resetToClassic = async () => {
     try {
@@ -311,6 +399,104 @@ export function SettingsDialog() {
             />
           </Field>
           <p className="help">{TEXT.countdownHelp}</p>
+        </section>
+
+        <section>
+          <h2>{TEXT.alerts}</h2>
+          <p className="help">{TEXT.alertsHelp}</p>
+          <label className="check">
+            <input
+              type="checkbox"
+              checked={form.alerts.muted}
+              onChange={(e) => editAlerts({ muted: e.target.checked })}
+            />
+            <span>{TEXT.mute}</span>
+          </label>
+          <label className="field volume">
+            <span>
+              {TEXT.volume}: {form.alerts.volume}%
+            </span>
+            <input
+              type="range"
+              min={0}
+              max={100}
+              step={5}
+              value={form.alerts.volume}
+              onChange={(e) => editAlerts({ volume: Number(e.target.value) })}
+            />
+          </label>
+          {ALERT_EVENTS.map(({ key, label }) => {
+            const alerts = form.alerts[key];
+            return (
+              <fieldset className="alert-event" key={key}>
+                <legend>{label}</legend>
+                <label className="check">
+                  <input
+                    type="checkbox"
+                    checked={alerts.notification}
+                    onChange={(e) => editEvent(key, { notification: e.target.checked })}
+                  />
+                  <span>{TEXT.notification}</span>
+                </label>
+                <label className="check">
+                  <input
+                    type="checkbox"
+                    checked={alerts.bring_to_front}
+                    onChange={(e) => editEvent(key, { bring_to_front: e.target.checked })}
+                  />
+                  <span>{TEXT.bringToFront}</span>
+                </label>
+                <div className="sound-row">
+                  <label className="check">
+                    <input
+                      type="checkbox"
+                      checked={alerts.sound_enabled}
+                      onChange={(e) => editEvent(key, { sound_enabled: e.target.checked })}
+                    />
+                    <span>{TEXT.sound}</span>
+                  </label>
+                  <select
+                    aria-label={`${label}: ${TEXT.sound}`}
+                    disabled={!alerts.sound_enabled}
+                    value={soundKey(alerts.sound)}
+                    onChange={(e) => editEvent(key, { sound: soundFromKey(e.target.value) })}
+                  >
+                    <optgroup label={TEXT.builtinSounds}>
+                      {(Object.keys(BUILTIN_SOUND_LABELS) as BuiltinSound[]).map((id) => (
+                        <option key={id} value={`builtin:${id}`}>
+                          {BUILTIN_SOUND_LABELS[id]}
+                        </option>
+                      ))}
+                    </optgroup>
+                    {customSounds.length > 0 && (
+                      <optgroup label={TEXT.yourSounds}>
+                        {customSounds.map((file) => (
+                          <option key={file} value={`custom:${file}`}>
+                            {file}
+                          </option>
+                        ))}
+                      </optgroup>
+                    )}
+                  </select>
+                  <button
+                    type="button"
+                    disabled={form.alerts.muted || !alerts.sound_enabled}
+                    title={form.alerts.muted ? TEXT.testMuted : TEXT.testHint}
+                    onClick={() => testSound(key)}
+                  >
+                    {TEXT.test}
+                  </button>
+                  <button
+                    type="button"
+                    title={TEXT.addFileHint}
+                    onClick={() => addSound(key)}
+                  >
+                    {TEXT.addFile}
+                  </button>
+                </div>
+              </fieldset>
+            );
+          })}
         </section>
 
         <section>

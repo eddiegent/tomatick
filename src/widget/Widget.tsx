@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 import "./widget.css";
+import { useAlertSounds } from "../alerts/useAlertSounds";
 import { engine, formatClock, useSnapshot, type Snapshot } from "../engine/api";
 import { formatDuration, parseDuration } from "../engine/duration";
 import { settingsApi, useSettings } from "../settings/api";
@@ -62,6 +63,7 @@ export function Widget() {
   const settings = useSettings();
   const size = settings?.settings.widget_size ?? "medium";
   useApplyWidgetSize(size);
+  useAlertSounds(settings?.settings.alerts);
 
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState("");

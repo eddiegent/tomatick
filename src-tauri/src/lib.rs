@@ -1,3 +1,4 @@
+pub mod alerts;
 pub mod engine;
 pub mod storage;
 
@@ -6,8 +7,12 @@ use std::thread;
 use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
+use tauri::ipc::Response;
 use tauri::{AppHandle, Emitter, Manager, State, WebviewUrl, WebviewWindowBuilder};
+use tauri_plugin_dialog::DialogExt;
+use tauri_plugin_notification::NotificationExt;
 
+use alerts::{SOUND_EXTENSIONS, SOUNDS_DIR};
 use engine::{Engine, EngineState, Event, Exercise, Mode, Snapshot, SystemClock, TimerSettings};
 use storage::{AppSettings, Store, clean_exercises};
 
@@ -25,6 +30,9 @@ const SETTINGS_EVENT: &str = "settings:changed";
 
 /// Label of the settings window.
 const SETTINGS_WINDOW: &str = "settings";
+
+/// Label of the widget window.
+const WIDGET_WINDOW: &str = "main";
 
 type SharedEngine = Mutex<Engine<SystemClock>>;
 type SharedStore = Mutex<Store>;
@@ -52,8 +60,40 @@ fn lock(engine: &SharedEngine) -> MutexGuard<'_, Engine<SystemClock>> {
 fn publish(app: &AppHandle, events: &[Event], snapshot: &Snapshot) {
     for event in events {
         let _ = app.emit(ENGINE_EVENT, event);
+        if let Event::Alert { event, label } = event {
+            run_alert(app, *event, label.as_deref());
+        }
     }
     let _ = app.emit(STATE_EVENT, snapshot);
+}
+
+/// Does the parts of an alert that belong to the system: the notification and
+/// raising the widget. The sound is played by the widget window, which hears
+/// the same engine event.
+fn run_alert(app: &AppHandle, event: engine::AlertEvent, label: Option<&str>) {
+    let alerts = {
+        let store = app.state::<SharedStore>();
+        let settings = lock_store(&store).load_settings().unwrap_or_default();
+        settings.alerts.for_event(event).clone()
+    };
+
+    if alerts.notification {
+        let (title, body) = alerts::notification_text(event, label);
+        if let Err(error) = app.notification().builder().title(title).body(body).show() {
+            eprintln!("Tomatick: cannot show the notification: {error}");
+        }
+    }
+    if alerts.bring_to_front {
+        bring_widget_to_front(app);
+    }
+}
+
+fn bring_widget_to_front(app: &AppHandle) {
+    if let Some(window) = app.get_webview_window(WIDGET_WINDOW) {
+        let _ = window.show();
+        let _ = window.unminimize();
+        let _ = window.set_focus();
+    }
 }
 
 /// Runs a command on the engine, then publishes its events and the new state.
@@ -202,6 +242,42 @@ fn settings_classic() -> TimerSettings {
     TimerSettings::classic()
 }
 
+/// The folder that holds the custom alert sounds.
+fn sounds_dir(app: &AppHandle) -> Result<std::path::PathBuf, String> {
+    app.path()
+        .app_data_dir()
+        .map(|dir| dir.join(SOUNDS_DIR))
+        .map_err(|e| e.to_string())
+}
+
+/// Lets the user pick an audio file and copies it into the app data folder.
+/// Returns the stored file name, or `None` if the dialog was cancelled.
+#[tauri::command]
+async fn sound_add(app: AppHandle) -> Result<Option<String>, String> {
+    let picked = app
+        .dialog()
+        .file()
+        .set_title("Choose an alert sound")
+        .add_filter("Audio", SOUND_EXTENSIONS)
+        .blocking_pick_file();
+    let Some(picked) = picked else {
+        return Ok(None);
+    };
+    let source = picked.into_path().map_err(|e| e.to_string())?;
+    alerts::import_sound(&source, &sounds_dir(&app)?)
+        .map(Some)
+        .map_err(|e| e.to_string())
+}
+
+/// The bytes of a custom sound, for the player in the webview.
+#[tauri::command]
+fn sound_data(app: AppHandle, file: String) -> Result<Response, String> {
+    let path = alerts::sound_path(&sounds_dir(&app)?, &file).map_err(|e| e.to_string())?;
+    std::fs::read(path)
+        .map(Response::new)
+        .map_err(|e| e.to_string())
+}
+
 /// Validates, stores and applies the settings and the exercise list.
 #[tauri::command]
 fn settings_save(
@@ -312,6 +388,8 @@ fn build_engine(store: &Store) -> Engine<SystemClock> {
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_notification::init())
+        .plugin(tauri_plugin_dialog::init())
         // Remember where the widget was left, on which monitor. Only the
         // position: the size is set by the widget size setting.
         .plugin(
@@ -324,6 +402,8 @@ pub fn run() {
             let engine = build_engine(&store);
             app.manage(Mutex::new(engine));
             app.manage(Mutex::new(store));
+            // Some systems ask the user once; elsewhere this is always granted.
+            let _ = app.notification().request_permission();
             spawn_ticker(app.handle().clone());
             Ok(())
         })
@@ -344,6 +424,8 @@ pub fn run() {
             settings_get,
             settings_classic,
             settings_save,
+            sound_add,
+            sound_data,
             settings_open,
         ])
         .run(tauri::generate_context!())
