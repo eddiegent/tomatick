@@ -135,7 +135,7 @@
 /* The break exercise stays readable while the menu icons show. */
 .widget:hover .label,
 .widget:focus-within .label {
-  opacity: 0.25;
+  opacity: 0.4;
 }
 
 /* ----- countdown editing ----- */
