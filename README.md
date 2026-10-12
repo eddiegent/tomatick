@@ -2,7 +2,7 @@
 
 A free, open source Pomodoro timer for Windows, macOS and Linux, built around a small always-on-top tomato widget.
 
-> **Status: early development.** There is no released version yet. The design is written down in [SPEC.md](SPEC.md), and the project skeleton (Tauri, React, CI) and the timer engine are in place. The tomato widget is next.
+> **Status: early development.** There is no released version yet. The design is written down in [SPEC.md](SPEC.md), and the project skeleton (Tauri, React, CI) the timer engine and the tomato widget are in place. Settings, alerts and history are next.
 
 ## What it is
 
@@ -66,6 +66,10 @@ The timer engine (`src-tauri/src/engine`) is plain Rust with no dependency on Ta
 ```
 cargo test --manifest-path src-tauri/Cargo.toml
 ```
+
+### Trying the widget
+
+`npm run tauri dev` opens the tomato: a frameless, transparent, always-on-top window. Drag it by its body, hover over it to reveal the controls, and press `1`, `2` or `3` to switch between the small, medium and large sizes (a temporary shortcut until the settings dialog exists). The statistics and settings buttons are disabled for now. There is no tray icon yet, so close the app with `Alt+F4` (Windows and Linux) or `Cmd+Q` (macOS), or from the taskbar or dock.
 
 Continuous integration builds the app on Windows, macOS and Linux for every push to `main` and every pull request.
 

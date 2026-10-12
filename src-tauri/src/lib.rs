@@ -173,6 +173,13 @@ pub fn run() {
 
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        // Remember where the widget was left, on which monitor. Only the
+        // position: the size is set by the widget size setting.
+        .plugin(
+            tauri_plugin_window_state::Builder::default()
+                .with_state_flags(tauri_plugin_window_state::StateFlags::POSITION)
+                .build(),
+        )
         .manage(Mutex::new(engine))
         .setup(|app| {
             spawn_ticker(app.handle().clone());

@@ -1,0 +1,240 @@
+/* ----- phase themes ----- */
+
+.widget[data-theme="work"] {
+  --tomato: #e5484d;
+  --tomato-light: #ff8a8d;
+  --leaf: #2f8f46;
+}
+
+.widget[data-theme="short_break"] {
+  --tomato: #3fa95b;
+  --tomato-light: #8fe0a3;
+  --leaf: #1d5c2c;
+}
+
+.widget[data-theme="long_break"] {
+  --tomato: #3b82f6;
+  --tomato-light: #9cc2ff;
+  --leaf: #2f8f46;
+}
+
+.widget[data-theme="countdown"] {
+  --tomato: #f5a524;
+  --tomato-light: #ffd98a;
+  --leaf: #2f8f46;
+}
+
+/* ----- layout ----- */
+
+.widget {
+  --size: 200px;
+  --btn: max(18px, calc(var(--size) * 0.13));
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+  border-radius: 50%;
+  color: #ffffff;
+}
+
+.body {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+}
+
+/* Everything inside the drag region lets clicks through to it. */
+.body > * {
+  pointer-events: none;
+}
+
+.tomato {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  transition: opacity 0.2s ease, filter 0.2s ease;
+}
+
+.ring-track,
+.ring-halo,
+.ring-progress {
+  fill: none;
+}
+
+.ring-track {
+  stroke: rgba(0, 0, 0, 0.28);
+  stroke-width: 5;
+}
+
+.ring-halo {
+  stroke: #ffffff;
+  stroke-opacity: 0.9;
+  stroke-width: 7.2;
+  stroke-linecap: round;
+}
+
+.ring-progress {
+  stroke: var(--tomato);
+  stroke-width: 4.4;
+  stroke-linecap: round;
+}
+
+/* ----- readout ----- */
+
+.time,
+.cycle,
+.label {
+  position: absolute;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  white-space: nowrap;
+  text-align: center;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+  transition: opacity 0.2s ease;
+}
+
+.time {
+  top: 54%;
+  font-size: calc(var(--size) * 0.2);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.01em;
+}
+
+.time.long {
+  font-size: calc(var(--size) * 0.15);
+}
+
+.cycle {
+  top: 39%;
+  font-size: calc(var(--size) * 0.065);
+  font-weight: 600;
+  opacity: 0.85;
+}
+
+.label {
+  top: 67%;
+  max-width: 58%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: calc(var(--size) * 0.06);
+  font-weight: 600;
+}
+
+/* The small size shows the time only. The rest is in the tooltip. */
+.widget[data-size="small"] .cycle,
+.widget[data-size="small"] .label {
+  display: none;
+}
+
+.widget:hover .cycle,
+.widget:hover .label,
+.widget:focus-within .cycle,
+.widget:focus-within .label {
+  opacity: 0.12;
+}
+
+/* ----- paused ----- */
+
+.widget[data-state="paused"] .tomato,
+.widget[data-state="auto_paused"] .tomato {
+  opacity: 0.55;
+  filter: saturate(0.55);
+}
+
+.paused-mark {
+  position: absolute;
+  left: 50%;
+  top: 27.5%;
+  width: calc(var(--size) * 0.09);
+  height: calc(var(--size) * 0.09);
+  transform: translate(-50%, -50%);
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.6));
+}
+
+.paused-mark svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.widget:hover .paused-mark,
+.widget:focus-within .paused-mark {
+  opacity: 0;
+}
+
+/* ----- controls ----- */
+
+.controls {
+  position: absolute;
+  left: 50%;
+  display: flex;
+  gap: calc(var(--size) * 0.025);
+  transform: translate(-50%, -50%);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s ease;
+}
+
+.controls.top {
+  top: 31%;
+}
+
+.controls.bottom {
+  top: 77%;
+}
+
+.widget:hover .controls,
+.widget:focus-within .controls {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.ctl {
+  display: grid;
+  place-items: center;
+  width: var(--btn);
+  height: var(--btn);
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  color: #ffffff;
+  background: rgba(0, 0, 0, 0.38);
+  cursor: pointer;
+  transition: background 0.12s ease, transform 0.12s ease;
+}
+
+.ctl.primary {
+  background: rgba(0, 0, 0, 0.55);
+}
+
+.ctl:hover:not(:disabled) {
+  background: rgba(0, 0, 0, 0.62);
+  transform: scale(1.08);
+}
+
+.ctl:focus-visible {
+  outline: 2px solid #ffffff;
+  outline-offset: 1px;
+}
+
+.ctl:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.ctl svg {
+  width: 62%;
+  height: 62%;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tomato,
+  .time,
+  .cycle,
+  .label,
+  .controls,
+  .ctl {
+    transition: none;
+  }
+}
