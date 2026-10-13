@@ -178,21 +178,6 @@ impl AlertSettings {
     }
 }
 
-/// The notification text of an event. `label` is the exercise of the break
-/// that starts, when there is one. English only until the translation
-/// milestone.
-pub fn notification_text(event: AlertEvent, label: Option<&str>) -> (&'static str, String) {
-    match event {
-        AlertEvent::WorkEnd => (
-            "Time for a break",
-            label.map_or_else(|| "Your work session is over.".to_string(), str::to_string),
-        ),
-        AlertEvent::ShortBreakEnd => ("Break over", "Back to work.".to_string()),
-        AlertEvent::LongBreakEnd => ("Long break over", "Back to work.".to_string()),
-        AlertEvent::CountdownEnd => ("Time's up", "The countdown has finished.".to_string()),
-    }
-}
-
 fn extension_of(name: &str) -> Option<String> {
     Path::new(name)
         .extension()
@@ -473,19 +458,6 @@ mod tests {
         assert!(name.chars().count() <= MAX_SOUND_NAME_CHARS);
         assert_eq!(check_sound_name(&name), Ok(()));
         let _ = fs::remove_dir_all(&root);
-    }
-
-    #[test]
-    fn the_notification_carries_the_break_label() {
-        let (title, body) = notification_text(AlertEvent::WorkEnd, Some("Planks (30 s)"));
-        assert_eq!(title, "Time for a break");
-        assert_eq!(body, "Planks (30 s)");
-
-        let (_, body) = notification_text(AlertEvent::WorkEnd, None);
-        assert_eq!(body, "Your work session is over.");
-
-        let (title, _) = notification_text(AlertEvent::CountdownEnd, None);
-        assert_eq!(title, "Time's up");
     }
 
     #[test]

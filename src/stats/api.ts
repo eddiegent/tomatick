@@ -27,12 +27,12 @@ export interface Stats {
 }
 
 /**
- * The first day of the week for the user's locale, 0 for Sunday to 6 for
+ * The first day of the week for the language of the app, 0 for Sunday to 6 for
  * Saturday. Falls back to Monday when the webview cannot tell.
  */
-export function localeWeekStart(): number {
+export function localeWeekStart(language: string): number {
   try {
-    const locale = new Intl.Locale(navigator.language) as Intl.Locale & {
+    const locale = new Intl.Locale(language) as Intl.Locale & {
       getWeekInfo?: () => { firstDay: number };
       weekInfo?: { firstDay: number };
     };
@@ -57,7 +57,11 @@ export const statsApi = {
  * The statistics of a period, refreshed when a phase is added to the
  * history. `null` until the first answer arrives.
  */
-export function useStats(period: Period, offset: number): {
+export function useStats(
+  period: Period,
+  offset: number,
+  language: string,
+): {
   stats: Stats | null;
   error: string | null;
 } {
@@ -84,7 +88,7 @@ export function useStats(period: Period, offset: number): {
   const load = useCallback(() => {
     let active = true;
     statsApi
-      .get(period, offset, localeWeekStart())
+      .get(period, offset, localeWeekStart(language))
       .then((next) => {
         if (active) {
           setStats(next);
@@ -99,7 +103,7 @@ export function useStats(period: Period, offset: number): {
     return () => {
       active = false;
     };
-  }, [period, offset]);
+  }, [period, offset, language]);
 
   useEffect(() => load(), [load, refresh]);
 

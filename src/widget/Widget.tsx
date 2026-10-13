@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState, type CSSProperties } from "react";
+import type { TFunction } from "i18next";
+import { useTranslation } from "react-i18next";
 import "./widget.css";
 import { useAlertSounds } from "../alerts/useAlertSounds";
 import { engine, formatClock, useSnapshot, type Snapshot } from "../engine/api";
@@ -17,46 +19,22 @@ import {
 } from "./icons";
 import { WIDGET_PIXELS, useApplyWidgetSize } from "./size";
 import { Tomato } from "./Tomato";
-import { progressOf, themeOf, type Theme } from "./theme";
+import { progressOf, themeOf } from "./theme";
 
-// English only for now. The text moves to the translation files in
-// milestone 10.
-const TEXT = {
-  phase: {
-    work: "Work",
-    short_break: "Short break",
-    long_break: "Long break",
-    countdown: "Countdown",
-  } satisfies Record<Theme, string>,
-  start: "Start",
-  pause: "Pause",
-  resume: "Resume",
-  skip: "Skip to the next phase",
-  reset: "Reset",
-  toCountdown: "Switch to countdown",
-  toPomodoro: "Switch to Pomodoro",
-  stats: "Statistics",
-  settings: "Settings",
-  setCountdown: "Click to set the countdown",
-  countdownInput: "Countdown duration",
-  countdownHint: "Minutes, or m:ss. Enter to set, Escape to cancel.",
-  paused: "Paused",
-  autoPaused: "Paused by the system",
-};
-
-function playLabel(snapshot: Snapshot): string {
+function playLabel(snapshot: Snapshot, t: TFunction): string {
   switch (snapshot.state) {
     case "running":
-      return TEXT.pause;
+      return t("widget.pause");
     case "idle":
-      return TEXT.start;
+      return t("widget.start");
     default:
-      return TEXT.resume;
+      return t("widget.resume");
   }
 }
 
 /** The always-on-top tomato. */
 export function Widget() {
+  const { t } = useTranslation();
   const snapshot = useSnapshot();
   const settings = useSettings();
   const size = settings?.settings.widget_size ?? "medium";
@@ -119,10 +97,10 @@ export function Widget() {
   const paused = snapshot.state === "paused" || snapshot.state === "auto_paused";
   const countdown = snapshot.mode === "countdown";
   const tooltip = [
-    TEXT.phase[theme],
+    t(`phase.${theme}`),
     time,
     snapshot.label,
-    paused ? (snapshot.state === "auto_paused" ? TEXT.autoPaused : TEXT.paused) : null,
+    paused ? (snapshot.state === "auto_paused" ? t("widget.autoPaused") : t("widget.paused")) : null,
   ]
     .filter(Boolean)
     .join(" | ");
@@ -157,8 +135,8 @@ export function Widget() {
         <button
           type="button"
           className="time-edit"
-          aria-label={TEXT.setCountdown}
-          title={TEXT.setCountdown}
+          aria-label={t("widget.setCountdown")}
+          title={t("widget.setCountdown")}
           onClick={beginEdit}
         />
       )}
@@ -170,9 +148,9 @@ export function Widget() {
             value={draft}
             inputMode="numeric"
             maxLength={8}
-            aria-label={TEXT.countdownInput}
+            aria-label={t("widget.countdownInput")}
             aria-invalid={invalid}
-            title={TEXT.countdownHint}
+            title={t("widget.countdownHint")}
             onChange={(event) => {
               // Pasted text can hold anything, so keep digits and colons only.
               setDraft(event.target.value.replace(/[^\d:]/g, ""));
@@ -217,8 +195,8 @@ export function Widget() {
         <button
           type="button"
           className="ctl"
-          aria-label={countdown ? TEXT.toPomodoro : TEXT.toCountdown}
-          title={countdown ? TEXT.toPomodoro : TEXT.toCountdown}
+          aria-label={countdown ? t("widget.toPomodoro") : t("widget.toCountdown")}
+          title={countdown ? t("widget.toPomodoro") : t("widget.toCountdown")}
           onClick={() => engine.setMode(countdown ? "pomodoro" : "countdown")}
         >
           <SwapIcon />
@@ -226,8 +204,8 @@ export function Widget() {
         <button
           type="button"
           className="ctl"
-          aria-label={TEXT.stats}
-          title={TEXT.stats}
+          aria-label={t("widget.stats")}
+          title={t("widget.stats")}
           onClick={() => statsApi.open()}
         >
           <ChartIcon />
@@ -235,8 +213,8 @@ export function Widget() {
         <button
           type="button"
           className="ctl"
-          aria-label={TEXT.settings}
-          title={TEXT.settings}
+          aria-label={t("widget.settings")}
+          title={t("widget.settings")}
           onClick={() => settingsApi.open()}
         >
           <CogIcon />
@@ -247,8 +225,8 @@ export function Widget() {
         <button
           type="button"
           className="ctl primary"
-          aria-label={playLabel(snapshot)}
-          title={playLabel(snapshot)}
+          aria-label={playLabel(snapshot, t)}
+          title={playLabel(snapshot, t)}
           onClick={() => engine.toggle()}
         >
           {running ? <PauseIcon /> : <PlayIcon />}
@@ -256,8 +234,8 @@ export function Widget() {
         <button
           type="button"
           className="ctl"
-          aria-label={TEXT.skip}
-          title={TEXT.skip}
+          aria-label={t("widget.skip")}
+          title={t("widget.skip")}
           disabled={countdown}
           onClick={() => engine.skip()}
         >
@@ -266,8 +244,8 @@ export function Widget() {
         <button
           type="button"
           className="ctl"
-          aria-label={TEXT.reset}
-          title={TEXT.reset}
+          aria-label={t("widget.reset")}
+          title={t("widget.reset")}
           onClick={() => engine.reset()}
         >
           <ResetIcon />

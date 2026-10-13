@@ -2,8 +2,7 @@
 //!
 //! The menu only reports what the user picked, as an [`Action`]. The host
 //! (`lib.rs`) carries the actions out, the same way it does for the global
-//! shortcuts. The text is English for now and moves to the locale files with
-//! the translations.
+//! shortcuts. The text comes from the locale files.
 
 use std::sync::Mutex;
 
@@ -12,6 +11,7 @@ use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent}
 use tauri::{AppHandle, Manager, Wry};
 
 use crate::engine::{EngineState, Mode, Snapshot};
+use crate::i18n::translate;
 
 const TRAY_ID: &str = "tomatick";
 
@@ -57,52 +57,73 @@ pub struct TrayItems {
     skip: MenuItem<Wry>,
     pomodoro: CheckMenuItem<Wry>,
     countdown: CheckMenuItem<Wry>,
+    stats: MenuItem<Wry>,
+    settings: MenuItem<Wry>,
+    quit: MenuItem<Wry>,
     /// What the items show now, so a refresh that changes nothing does nothing.
-    shown: Mutex<Option<(Mode, EngineState, bool)>>,
+    shown: Mutex<Option<(Mode, EngineState, bool, &'static str)>>,
 }
 
-fn start_pause_text(state: EngineState) -> &'static str {
-    match state {
-        EngineState::Idle => "Start",
-        EngineState::Running => "Pause",
-        EngineState::Paused | EngineState::AutoPaused => "Resume",
-    }
+fn start_pause_text(language: &str, state: EngineState) -> String {
+    translate(
+        language,
+        match state {
+            EngineState::Idle => "tray.start",
+            EngineState::Running => "tray.pause",
+            EngineState::Paused | EngineState::AutoPaused => "tray.resume",
+        },
+    )
 }
 
-fn widget_text(visible: bool) -> &'static str {
-    if visible {
-        "Hide widget"
-    } else {
-        "Show widget"
-    }
+fn widget_text(language: &str, visible: bool) -> String {
+    translate(
+        language,
+        if visible {
+            "tray.hideWidget"
+        } else {
+            "tray.showWidget"
+        },
+    )
 }
 
 /// Builds the tray icon. Fails where the system has no tray (some Linux
 /// desktops), and the app then runs without one.
-pub fn build(app: &AppHandle) -> tauri::Result<()> {
-    let toggle_widget =
-        MenuItem::with_id(app, ID_TOGGLE_WIDGET, widget_text(true), true, None::<&str>)?;
-    let start_pause = MenuItem::with_id(
+pub fn build(app: &AppHandle, language: &str) -> tauri::Result<()> {
+    let text = |key: &str| translate(language, key);
+    let toggle_widget = MenuItem::with_id(
         app,
-        ID_START_PAUSE,
-        start_pause_text(EngineState::Idle),
+        ID_TOGGLE_WIDGET,
+        widget_text(language, true),
         true,
         None::<&str>,
     )?;
-    let skip = MenuItem::with_id(app, ID_SKIP, "Skip to next phase", true, None::<&str>)?;
-    let pomodoro =
-        CheckMenuItem::with_id(app, ID_POMODORO, "Pomodoro mode", true, true, None::<&str>)?;
+    let start_pause = MenuItem::with_id(
+        app,
+        ID_START_PAUSE,
+        start_pause_text(language, EngineState::Idle),
+        true,
+        None::<&str>,
+    )?;
+    let skip = MenuItem::with_id(app, ID_SKIP, text("tray.skip"), true, None::<&str>)?;
+    let pomodoro = CheckMenuItem::with_id(
+        app,
+        ID_POMODORO,
+        text("tray.pomodoroMode"),
+        true,
+        true,
+        None::<&str>,
+    )?;
     let countdown = CheckMenuItem::with_id(
         app,
         ID_COUNTDOWN,
-        "Countdown mode",
+        text("tray.countdownMode"),
         true,
         false,
         None::<&str>,
     )?;
-    let stats = MenuItem::with_id(app, ID_STATS, "Statistics", true, None::<&str>)?;
-    let settings = MenuItem::with_id(app, ID_SETTINGS, "Settings", true, None::<&str>)?;
-    let quit = MenuItem::with_id(app, ID_QUIT, "Quit Tomatick", true, None::<&str>)?;
+    let stats = MenuItem::with_id(app, ID_STATS, text("tray.stats"), true, None::<&str>)?;
+    let settings = MenuItem::with_id(app, ID_SETTINGS, text("tray.settings"), true, None::<&str>)?;
+    let quit = MenuItem::with_id(app, ID_QUIT, text("tray.quit"), true, None::<&str>)?;
     let first = PredefinedMenuItem::separator(app)?;
     let second = PredefinedMenuItem::separator(app)?;
     let third = PredefinedMenuItem::separator(app)?;
@@ -125,7 +146,7 @@ pub fn build(app: &AppHandle) -> tauri::Result<()> {
     )?;
 
     let mut builder = TrayIconBuilder::with_id(TRAY_ID)
-        .tooltip("Tomatick")
+        .tooltip(text("tray.tooltip"))
         .menu(&menu)
         .show_menu_on_left_click(false)
         .on_menu_event(|app, event| {
@@ -156,6 +177,9 @@ pub fn build(app: &AppHandle) -> tauri::Result<()> {
         skip,
         pomodoro,
         countdown,
+        stats,
+        settings,
+        quit,
         shown: Mutex::new(None),
     });
     Ok(())
@@ -163,11 +187,11 @@ pub fn build(app: &AppHandle) -> tauri::Result<()> {
 
 /// Brings the menu in line with the state of the timer and the widget.
 /// Cheap to call often: nothing happens unless something changed.
-pub fn refresh(app: &AppHandle, snapshot: &Snapshot, widget_visible: bool) {
+pub fn refresh(app: &AppHandle, snapshot: &Snapshot, widget_visible: bool, language: &'static str) {
     let Some(items) = app.try_state::<TrayItems>() else {
         return;
     };
-    let key = (snapshot.mode, snapshot.state, widget_visible);
+    let key = (snapshot.mode, snapshot.state, widget_visible, language);
     {
         let mut shown = items
             .shown
@@ -178,8 +202,24 @@ pub fn refresh(app: &AppHandle, snapshot: &Snapshot, widget_visible: bool) {
         }
         *shown = Some(key);
     }
-    let _ = items.toggle_widget.set_text(widget_text(widget_visible));
-    let _ = items.start_pause.set_text(start_pause_text(snapshot.state));
+    let _ = items
+        .toggle_widget
+        .set_text(widget_text(language, widget_visible));
+    let _ = items
+        .start_pause
+        .set_text(start_pause_text(language, snapshot.state));
+    let _ = items.skip.set_text(translate(language, "tray.skip"));
+    let _ = items
+        .pomodoro
+        .set_text(translate(language, "tray.pomodoroMode"));
+    let _ = items
+        .countdown
+        .set_text(translate(language, "tray.countdownMode"));
+    let _ = items.stats.set_text(translate(language, "tray.stats"));
+    let _ = items
+        .settings
+        .set_text(translate(language, "tray.settings"));
+    let _ = items.quit.set_text(translate(language, "tray.quit"));
     let _ = items.skip.set_enabled(snapshot.mode == Mode::Pomodoro);
     let _ = items.pomodoro.set_checked(snapshot.mode == Mode::Pomodoro);
     let _ = items

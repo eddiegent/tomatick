@@ -15,6 +15,7 @@ use crate::alerts::{AlertError, AlertSettings};
 use crate::engine::{
     COUNTDOWN_SECS_RANGE, DEFAULT_COUNTDOWN_SECS, EngineError, Exercise, TimerSettings,
 };
+use crate::i18n;
 use crate::shortcuts::{ShortcutError, ShortcutSettings};
 
 /// The key under which [`AppSettings`] is stored in the `settings` table.
@@ -118,6 +119,8 @@ pub enum SettingsError {
     Timer(EngineError),
     Alerts(AlertError),
     Shortcuts(ShortcutError),
+    /// A language that has no locale file.
+    Language(String),
 }
 
 impl fmt::Display for SettingsError {
@@ -126,6 +129,7 @@ impl fmt::Display for SettingsError {
             SettingsError::Timer(error) => write!(f, "{error}"),
             SettingsError::Alerts(error) => write!(f, "{error}"),
             SettingsError::Shortcuts(error) => write!(f, "{error}"),
+            SettingsError::Language(code) => write!(f, "unknown language: {code}"),
         }
     }
 }
@@ -175,6 +179,8 @@ pub struct AppSettings {
     /// Start Tomatick when the user logs in.
     pub launch_at_login: bool,
     pub shortcuts: ShortcutSettings,
+    /// "system", or the code of a language that has a locale file.
+    pub language: String,
     pub alerts: AlertSettings,
 }
 
@@ -188,6 +194,7 @@ impl Default for AppSettings {
             daily_goal: DEFAULT_DAILY_GOAL,
             launch_at_login: false,
             shortcuts: ShortcutSettings::default(),
+            language: i18n::SYSTEM.to_string(),
             alerts: AlertSettings::default(),
         }
     }
@@ -207,6 +214,9 @@ impl AppSettings {
         }
         crate::engine::check_range("daily_goal", self.daily_goal, DAILY_GOAL_RANGE)?;
         self.shortcuts.validate()?;
+        if self.language != i18n::SYSTEM && !i18n::is_supported(&self.language) {
+            return Err(SettingsError::Language(self.language.clone()));
+        }
         self.alerts.validate()?;
         Ok(())
     }
@@ -442,6 +452,16 @@ mod tests {
         assert_eq!(loaded.daily_goal, 3);
         assert_eq!(loaded.shortcuts, ShortcutSettings::default());
         assert!(!loaded.launch_at_login);
+    }
+
+    #[test]
+    fn the_language_defaults_to_the_system_and_must_exist() {
+        let mut settings = AppSettings::default();
+        assert_eq!(settings.language, "system");
+        settings.language = "fr".to_string();
+        assert!(settings.validate().is_ok());
+        settings.language = "xx".to_string();
+        assert!(settings.validate().is_err());
     }
 
     #[test]

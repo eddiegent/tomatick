@@ -1,6 +1,7 @@
 pub mod alerts;
 pub mod engine;
 pub mod history;
+pub mod i18n;
 pub mod overlay;
 pub mod power;
 pub mod shortcuts;
@@ -99,7 +100,7 @@ fn publish(app: &AppHandle, events: &[Event], snapshot: &Snapshot) {
         record_history(app, event, snapshot);
     }
     let _ = app.emit(STATE_EVENT, snapshot);
-    tray::refresh(app, snapshot, widget_visible(app));
+    tray::refresh(app, snapshot, widget_visible(app), current_language(app));
 }
 
 fn unix_now_ms() -> u64 {
@@ -167,7 +168,7 @@ fn run_alert(app: &AppHandle, event: engine::AlertEvent, label: Option<&str>) {
     };
 
     if alerts.notification {
-        let (title, body) = alerts::notification_text(event, label);
+        let (title, body) = i18n::notification_text(current_language(app), event, label);
         if let Err(error) = app.notification().builder().title(title).body(body).show() {
             eprintln!("Tomatick: cannot show the notification: {error}");
         }
@@ -198,7 +199,7 @@ fn toggle_widget(app: &AppHandle) {
         }
     }
     let snapshot = lock(&app.state::<SharedEngine>()).snapshot();
-    tray::refresh(app, &snapshot, widget_visible(app));
+    tray::refresh(app, &snapshot, widget_visible(app), current_language(app));
 }
 
 /// Carries out something asked for from the tray menu or a global shortcut.
@@ -259,8 +260,33 @@ struct DesktopStatus {
 /// Which registered shortcut does what, and how the last registration went.
 #[derive(Default)]
 struct Desktop {
+    /// The language of the text the Rust side produces.
+    language: Mutex<&'static str>,
     bindings: Mutex<Vec<(u32, Action)>>,
     status: Mutex<DesktopStatus>,
+}
+
+/// The language for the tray, the notifications and the window titles.
+fn current_language(app: &AppHandle) -> &'static str {
+    match app.try_state::<Desktop>() {
+        Some(desktop) => {
+            let language = *lock_desktop(&desktop.language);
+            if language.is_empty() {
+                i18n::FALLBACK
+            } else {
+                language
+            }
+        }
+        None => i18n::FALLBACK,
+    }
+}
+
+/// Picks the language from the setting, "system" meaning the language of
+/// the operating system, and remembers it.
+fn apply_language(app: &AppHandle, setting: &str) {
+    let system = sys_locale::get_locale();
+    let language = i18n::resolve(setting, system.as_deref());
+    *lock_desktop(&app.state::<Desktop>().language) = language;
 }
 
 fn lock_desktop<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
@@ -586,11 +612,12 @@ fn sounds_dir(app: &AppHandle) -> Result<std::path::PathBuf, String> {
 /// Returns the stored file name, or `None` if the dialog was cancelled.
 #[tauri::command]
 async fn sound_add(app: AppHandle) -> Result<Option<String>, String> {
+    let language = current_language(&app);
     let picked = app
         .dialog()
         .file()
-        .set_title("Choose an alert sound")
-        .add_filter("Audio", SOUND_EXTENSIONS)
+        .set_title(i18n::translate(language, "dialog.chooseSound"))
+        .add_filter(i18n::translate(language, "dialog.audio"), SOUND_EXTENSIONS)
         .blocking_pick_file();
     let Some(picked) = picked else {
         return Ok(None);
@@ -630,6 +657,8 @@ fn settings_save(
         (previous, saved)
     };
 
+    // Before the engine publishes, so the tray is relabeled by that publish.
+    apply_language(&app, &settings.language);
     let countdown_changed = previous.countdown_secs != settings.countdown_secs;
     run_checked(&app, &engine, |e| {
         e.update_settings(settings.timer.clone())?;
@@ -689,7 +718,7 @@ fn open_stats_window(app: &AppHandle) -> Result<(), String> {
         return window.set_focus().map_err(|e| e.to_string());
     }
     WebviewWindowBuilder::new(app, STATS_WINDOW, WebviewUrl::App("index.html".into()))
-        .title("Tomatick statistics")
+        .title(i18n::translate(current_language(app), "windowTitle.stats"))
         .inner_size(600.0, 760.0)
         .min_inner_size(460.0, 520.0)
         .resizable(true)
@@ -710,7 +739,10 @@ fn open_settings_window(app: &AppHandle) -> Result<(), String> {
         return window.set_focus().map_err(|e| e.to_string());
     }
     WebviewWindowBuilder::new(app, SETTINGS_WINDOW, WebviewUrl::App("index.html".into()))
-        .title("Tomatick settings")
+        .title(i18n::translate(
+            current_language(app),
+            "windowTitle.settings",
+        ))
         .inner_size(540.0, 700.0)
         .min_inner_size(440.0, 480.0)
         .resizable(true)
@@ -837,8 +869,9 @@ pub fn run() {
             app.manage(Mutex::new(engine));
             app.manage(Mutex::new(store));
             app.manage(Desktop::default());
+            apply_language(app.handle(), &settings.language);
             apply_shortcuts(app.handle(), &settings.shortcuts);
-            if let Err(error) = tray::build(app.handle()) {
+            if let Err(error) = tray::build(app.handle(), current_language(app.handle())) {
                 eprintln!("Tomatick: no tray icon: {error}");
             }
             // Some systems ask the user once; elsewhere this is always granted.

@@ -1,8 +1,11 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import type { TFunction } from "i18next";
+import { useTranslation } from "react-i18next";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import "./settings.css";
 import { playSound } from "../alerts/sound";
 import type { AlertEvent, Exercise, SleepBehavior, TimerSettings } from "../engine/api";
+import { LANGUAGES } from "../i18n";
 import { formatDuration, parseDuration } from "../engine/duration";
 import {
   desktopApi,
@@ -27,94 +30,18 @@ import {
   type Shortcuts,
 } from "./shortcut";
 
-// English only for now. The text moves to the translation files in
-// milestone 10.
-const TEXT = {
-  title: "Settings",
-  cycle: "Pomodoro cycle",
-  work: "Work (minutes)",
-  shortBreak: "Short break (minutes)",
-  longBreak: "Long break (minutes)",
-  sessions: "Work sessions before a long break",
-  goal: "Daily goal (pomodoros)",
-  autoStart: "Start the next phase automatically",
-  sleep: "When the computer sleeps or locks",
-  sleepPause: "Pause the timer",
-  sleepKeep: "Keep the timer running",
-  widget: "Widget",
-  small: "Small",
-  medium: "Medium",
-  large: "Large",
-  system: "System",
-  launch: "Launch Tomatick when I log in",
-  shortcuts: "Global shortcuts",
-  shortcutsHelp:
-    "Work even when another application has focus. Click a shortcut, then press the new keys. Escape cancels.",
-  shortcutStartPause: "Start or pause",
-  shortcutSkip: "Skip to the next phase",
-  shortcutToggle: "Show or hide the widget",
-  shortcutNone: "Not set",
-  shortcutPress: "Press the keys",
-  shortcutNeedsModifier: "Hold Ctrl, Alt, Shift or Cmd together with the key.",
-  shortcutClear: "Clear",
-  shortcutDefault: "Default",
-  shortcutFailed: "Could not register this shortcut: ",
-  launchFailed: "Could not change launch at login: ",
-  desktopProblems: "Saved, but some desktop settings did not apply. See the System section.",
-  countdown: "Countdown timer",
-  countdownStart: "Starting value",
-  countdownHelp: "Minutes, or m:ss (for example 10 or 1:30).",
-  countdownPresets: "Quick choices",
-  countdownPresetsHelp:
-    "One to six durations, separated by commas (for example 5, 10, 15, 30 or 1:30). They appear when you edit the countdown on the widget.",
-  alerts: "Alerts",
-  alertsHelp:
-    "What happens when a phase ends. Sounds play through the app, independent of the system volume.",
-  volume: "Volume",
-  mute: "Mute all alert sounds",
-  notification: "System notification",
-  bringToFront: "Bring the widget to the front",
-  overlay: "Full-screen overlay",
-  previewOverlay: "Preview overlay",
-  previewOverlayHint: "Show the overlay with sample content. The timer is not touched.",
-  sound: "Sound",
-  builtinSounds: "Built-in",
-  yourSounds: "Your files",
-  test: "Test",
-  testHint: "Play this sound",
-  testMuted: "Unmute to test",
-  addFile: "Add a file",
-  addFileHint: "Use your own MP3, WAV or OGG file",
-  soundFailed: "This sound cannot be played: ",
-  exercises: "Break exercises",
-  exercisesHelp:
-    "The app goes through this list in order, one entry per short break. A long break is split into several short ones and uses the list the same way.",
-  exerciseName: "Exercise",
-  exerciseAmount: "Amount (optional)",
-  dragHandle: "Drag to reorder",
-  moveUp: "Move up",
-  moveDown: "Move down",
-  remove: "Remove",
-  add: "Add an exercise",
-  reset: "Reset to classic",
-  resetDone: "Classic values loaded (25/5/15, 4 sessions). Save to apply them.",
-  cancel: "Cancel",
-  save: "Save",
-  saving: "Saving",
-};
-
-const ALERT_EVENTS: { key: AlertEvent; label: string; overlay?: OverlayKind }[] = [
-  { key: "work_end", label: "Work ends (a break starts)", overlay: "break" },
-  { key: "short_break_end", label: "Short break ends" },
-  { key: "long_break_end", label: "Long break ends" },
-  { key: "countdown_end", label: "Countdown ends", overlay: "countdown" },
+const ALERT_EVENTS: { key: AlertEvent; labelKey: string; overlay?: OverlayKind }[] = [
+  { key: "work_end", labelKey: "settings.alertWorkEnd", overlay: "break" },
+  { key: "short_break_end", labelKey: "settings.alertShortBreakEnd" },
+  { key: "long_break_end", labelKey: "settings.alertLongBreakEnd" },
+  { key: "countdown_end", labelKey: "settings.alertCountdownEnd", overlay: "countdown" },
 ];
 
 const BUILTIN_SOUND_LABELS: Record<BuiltinSound, string> = {
-  chime: "Soft chime",
-  bell: "Bell",
-  beep: "Gentle beep",
-  marimba: "Marimba",
+  chime: "settings.soundChime",
+  bell: "settings.soundBell",
+  beep: "settings.soundBeep",
+  marimba: "settings.soundMarimba",
 };
 
 const soundKey = (choice: SoundChoice) => `${choice.kind}:${choice.value}`;
@@ -143,6 +70,7 @@ interface Form {
   sessions: string;
   goal: string;
   launch: boolean;
+  language: string;
   shortcuts: Shortcuts;
   autoStart: boolean;
   sleep: SleepBehavior;
@@ -159,6 +87,7 @@ function toForm(settings: AppSettings, exercises: Exercise[]): Form {
     size: settings.widget_size,
     goal: String(settings.daily_goal),
     launch: settings.launch_at_login,
+    language: settings.language,
     shortcuts: settings.shortcuts,
     countdown: formatDuration(settings.countdown_secs),
     presets: settings.countdown_presets.map(formatDuration).join(", "),
@@ -212,7 +141,7 @@ function parsePresets(text: string): number[] | null {
 }
 
 /** Turns the form into settings, or returns the first problem found. */
-function fromForm(form: Form): { settings: AppSettings } | { error: string } {
+function fromForm(form: Form, t: TFunction): { settings: AppSettings } | { error: string } {
   const work = whole(form.work, LIMITS.work);
   const shortBreak = whole(form.shortBreak, LIMITS.shortBreak);
   const longBreak = whole(form.longBreak, LIMITS.longBreak);
@@ -222,27 +151,25 @@ function fromForm(form: Form): { settings: AppSettings } | { error: string } {
   const presets = parsePresets(form.presets);
 
   if (work === null) {
-    return { error: `Work must be a whole number from ${LIMITS.work[0]} to ${LIMITS.work[1]} minutes.` };
+    return { error: t("settings.errWork", { min: LIMITS.work[0], max: LIMITS.work[1] }) };
   }
   if (shortBreak === null) {
-    return { error: `Short break must be a whole number from ${LIMITS.shortBreak[0]} to ${LIMITS.shortBreak[1]} minutes.` };
+    return { error: t("settings.errShortBreak", { min: LIMITS.shortBreak[0], max: LIMITS.shortBreak[1] }) };
   }
   if (longBreak === null) {
-    return { error: `Long break must be a whole number from ${LIMITS.longBreak[0]} to ${LIMITS.longBreak[1]} minutes.` };
+    return { error: t("settings.errLongBreak", { min: LIMITS.longBreak[0], max: LIMITS.longBreak[1] }) };
   }
   if (sessions === null) {
-    return { error: `Sessions must be a whole number from ${LIMITS.sessions[0]} to ${LIMITS.sessions[1]}.` };
+    return { error: t("settings.errSessions", { min: LIMITS.sessions[0], max: LIMITS.sessions[1] }) };
   }
   if (goal === null) {
-    return { error: `The daily goal must be a whole number from ${LIMITS.goal[0]} to ${LIMITS.goal[1]}.` };
+    return { error: t("settings.errGoal", { min: LIMITS.goal[0], max: LIMITS.goal[1] }) };
   }
   if (countdown === null) {
-    return { error: "The countdown must be between 0:01 and 23:59:59." };
+    return { error: t("settings.errCountdown") };
   }
   if (presets === null) {
-    return {
-      error: `Quick choices must be one to ${MAX_PRESETS} durations between 0:01 and 23:59:59, separated by commas.`,
-    };
+    return { error: t("settings.errPresets", { max: MAX_PRESETS }) };
   }
   return {
     settings: {
@@ -259,6 +186,7 @@ function fromForm(form: Form): { settings: AppSettings } | { error: string } {
       countdown_presets: presets,
       daily_goal: goal,
       launch_at_login: form.launch,
+      language: form.language,
       shortcuts: form.shortcuts,
       alerts: form.alerts,
     },
@@ -266,9 +194,9 @@ function fromForm(form: Form): { settings: AppSettings } | { error: string } {
 }
 
 const SHORTCUT_LABELS: { key: ShortcutAction; label: string }[] = [
-  { key: "start_pause", label: TEXT.shortcutStartPause },
-  { key: "skip", label: TEXT.shortcutSkip },
-  { key: "toggle_widget", label: TEXT.shortcutToggle },
+  { key: "start_pause", label: "settings.shortcutStartPause" },
+  { key: "skip", label: "settings.shortcutSkip" },
+  { key: "toggle_widget", label: "settings.shortcutToggle" },
 ];
 
 /** A shortcut that is changed by pressing the new keys. */
@@ -285,6 +213,7 @@ function ShortcutField({
   onChange: (value: string) => void;
   onDefault: () => void;
 }) {
+  const { t } = useTranslation();
   const [recording, setRecording] = useState(false);
   const [hint, setHint] = useState<string | null>(null);
   const mac = isMac();
@@ -306,7 +235,7 @@ function ShortcutField({
       return;
     }
     if (result === "needs-modifier") {
-      setHint(TEXT.shortcutNeedsModifier);
+      setHint(t("settings.shortcutNeedsModifier"));
       return;
     }
     onChange(result);
@@ -320,7 +249,7 @@ function ShortcutField({
       <button
         type="button"
         className={recording ? "shortcut recording" : "shortcut"}
-        aria-label={`${label}: ${value === "" ? TEXT.shortcutNone : displayShortcut(value, mac)}`}
+        aria-label={`${label}: ${value === "" ? t("settings.shortcutNone") : displayShortcut(value, mac)}`}
         onClick={() => setRecording(true)}
         onBlur={() => {
           setRecording(false);
@@ -328,16 +257,16 @@ function ShortcutField({
         }}
         onKeyDown={onKeyDown}
       >
-        {recording ? TEXT.shortcutPress : value === "" ? TEXT.shortcutNone : displayShortcut(value, mac)}
+        {recording ? t("settings.shortcutPress") : value === "" ? t("settings.shortcutNone") : displayShortcut(value, mac)}
       </button>
       <button type="button" className="secondary" onClick={onDefault}>
-        {TEXT.shortcutDefault}
+        {t("settings.shortcutDefault")}
       </button>
       <button type="button" className="secondary" onClick={() => onChange("")}>
-        {TEXT.shortcutClear}
+        {t("settings.shortcutClear")}
       </button>
       {(hint || error) && (
-        <p className="error shortcut-error">{hint ?? `${TEXT.shortcutFailed}${error}`}</p>
+        <p className="error shortcut-error">{hint ?? `${t("settings.shortcutFailed")}${error}`}</p>
       )}
     </div>
   );
@@ -360,6 +289,7 @@ function closeWindow() {
 
 /** The settings window, opened from the cog of the widget. */
 export function SettingsDialog() {
+  const { t } = useTranslation();
   const [form, setForm] = useState<Form | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -371,7 +301,6 @@ export function SettingsDialog() {
   const listRef = useRef<HTMLOListElement>(null);
 
   useEffect(() => {
-    document.title = TEXT.title;
     settingsApi
       .get()
       .then(({ settings, exercises }) => setForm(toForm(settings, exercises)))
@@ -381,6 +310,10 @@ export function SettingsDialog() {
       .then(setDesktop)
       .catch(() => {});
   }, []);
+
+  useEffect(() => {
+    document.title = t("settings.title");
+  }, [t]);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -457,7 +390,7 @@ export function SettingsDialog() {
 
   const testSound = (key: AlertEvent) => {
     playSound(form.alerts[key].sound, form.alerts.volume).catch((e) =>
-      setError(`${TEXT.soundFailed}${String(e)}`),
+      setError(`${t("settings.soundFailed")}${String(e)}`),
     );
   };
 
@@ -487,14 +420,14 @@ export function SettingsDialog() {
       const classic = await settingsApi.classic();
       setForm({ ...form, ...timerToForm(classic) });
       setError(null);
-      setNotice(TEXT.resetDone);
+      setNotice(t("settings.resetDone"));
     } catch (e) {
       setError(String(e));
     }
   };
 
   const save = async () => {
-    const result = fromForm(form);
+    const result = fromForm(form, t);
     if ("error" in result) {
       setError(result.error);
       return;
@@ -510,7 +443,7 @@ export function SettingsDialog() {
         status !== null &&
         (status.autostart_error !== null || status.shortcuts.some((s) => s.error !== null));
       if (failed) {
-        setError(TEXT.desktopProblems);
+        setError(t("settings.desktopProblems"));
         setSaving(false);
         return;
       }
@@ -525,9 +458,9 @@ export function SettingsDialog() {
     <div className="settings">
       <main>
         <section>
-          <h2>{TEXT.cycle}</h2>
+          <h2>{t("settings.cycle")}</h2>
           <div className="grid">
-            <Field label={TEXT.work}>
+            <Field label={t("settings.work")}>
               <input
                 type="number"
                 min={LIMITS.work[0]}
@@ -536,7 +469,7 @@ export function SettingsDialog() {
                 onChange={(e) => change({ work: e.target.value })}
               />
             </Field>
-            <Field label={TEXT.shortBreak}>
+            <Field label={t("settings.shortBreak")}>
               <input
                 type="number"
                 min={LIMITS.shortBreak[0]}
@@ -545,7 +478,7 @@ export function SettingsDialog() {
                 onChange={(e) => change({ shortBreak: e.target.value })}
               />
             </Field>
-            <Field label={TEXT.longBreak}>
+            <Field label={t("settings.longBreak")}>
               <input
                 type="number"
                 min={LIMITS.longBreak[0]}
@@ -554,7 +487,7 @@ export function SettingsDialog() {
                 onChange={(e) => change({ longBreak: e.target.value })}
               />
             </Field>
-            <Field label={TEXT.sessions}>
+            <Field label={t("settings.sessions")}>
               <input
                 type="number"
                 min={LIMITS.sessions[0]}
@@ -563,7 +496,7 @@ export function SettingsDialog() {
                 onChange={(e) => change({ sessions: e.target.value })}
               />
             </Field>
-            <Field label={TEXT.goal}>
+            <Field label={t("settings.goal")}>
               <input
                 type="number"
                 min={LIMITS.goal[0]}
@@ -579,22 +512,22 @@ export function SettingsDialog() {
               checked={form.autoStart}
               onChange={(e) => change({ autoStart: e.target.checked })}
             />
-            <span>{TEXT.autoStart}</span>
+            <span>{t("settings.autoStart")}</span>
           </label>
-          <Field label={TEXT.sleep}>
+          <Field label={t("settings.sleep")}>
             <select
               value={form.sleep}
               onChange={(e) => change({ sleep: e.target.value as SleepBehavior })}
             >
-              <option value="auto_pause">{TEXT.sleepPause}</option>
-              <option value="keep_running">{TEXT.sleepKeep}</option>
+              <option value="auto_pause">{t("settings.sleepPause")}</option>
+              <option value="keep_running">{t("settings.sleepKeep")}</option>
             </select>
           </Field>
         </section>
 
         <section>
-          <h2>{TEXT.widget}</h2>
-          <div className="segmented" role="radiogroup" aria-label={TEXT.widget}>
+          <h2>{t("settings.widget")}</h2>
+          <div className="segmented" role="radiogroup" aria-label={t("settings.widget")}>
             {(["small", "medium", "large"] as const).map((size) => (
               <label key={size} className={form.size === size ? "selected" : ""}>
                 <input
@@ -603,31 +536,41 @@ export function SettingsDialog() {
                   checked={form.size === size}
                   onChange={() => change({ size })}
                 />
-                {TEXT[size]}
+                {t(`settings.${size}`)}
               </label>
             ))}
           </div>
         </section>
 
         <section>
-          <h2>{TEXT.system}</h2>
+          <h2>{t("settings.system")}</h2>
           <label className="check">
             <input
               type="checkbox"
               checked={form.launch}
               onChange={(e) => change({ launch: e.target.checked })}
             />
-            {TEXT.launch}
+            {t("settings.launch")}
           </label>
           {desktop?.autostart_error && (
-            <p className="error">{`${TEXT.launchFailed}${desktop.autostart_error}`}</p>
+            <p className="error">{`${t("settings.launchFailed")}${desktop.autostart_error}`}</p>
           )}
-          <h3>{TEXT.shortcuts}</h3>
-          <p className="help">{TEXT.shortcutsHelp}</p>
+          <Field label={t("settings.language")}>
+            <select value={form.language} onChange={(e) => change({ language: e.target.value })}>
+              <option value="system">{t("settings.languageSystem")}</option>
+              {LANGUAGES.map(({ code, name }) => (
+                <option key={code} value={code}>
+                  {name}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <h3>{t("settings.shortcuts")}</h3>
+          <p className="help">{t("settings.shortcutsHelp")}</p>
           {SHORTCUT_LABELS.map(({ key, label }) => (
             <ShortcutField
               key={key}
-              label={label}
+              label={t(label)}
               value={form.shortcuts[key]}
               error={desktop?.shortcuts.find((s) => s.action === key)?.error ?? null}
               onChange={(value) => change({ shortcuts: { ...form.shortcuts, [key]: value } })}
@@ -639,8 +582,8 @@ export function SettingsDialog() {
         </section>
 
         <section>
-          <h2>{TEXT.countdown}</h2>
-          <Field label={TEXT.countdownStart}>
+          <h2>{t("settings.countdown")}</h2>
+          <Field label={t("settings.countdownStart")}>
             <input
               type="text"
               inputMode="numeric"
@@ -648,31 +591,31 @@ export function SettingsDialog() {
               onChange={(e) => change({ countdown: e.target.value })}
             />
           </Field>
-          <p className="help">{TEXT.countdownHelp}</p>
-          <Field label={TEXT.countdownPresets}>
+          <p className="help">{t("settings.countdownHelp")}</p>
+          <Field label={t("settings.countdownPresets")}>
             <input
               type="text"
               value={form.presets}
               onChange={(e) => change({ presets: e.target.value })}
             />
           </Field>
-          <p className="help">{TEXT.countdownPresetsHelp}</p>
+          <p className="help">{t("settings.countdownPresetsHelp")}</p>
         </section>
 
         <section>
-          <h2>{TEXT.alerts}</h2>
-          <p className="help">{TEXT.alertsHelp}</p>
+          <h2>{t("settings.alerts")}</h2>
+          <p className="help">{t("settings.alertsHelp")}</p>
           <label className="check">
             <input
               type="checkbox"
               checked={form.alerts.muted}
               onChange={(e) => editAlerts({ muted: e.target.checked })}
             />
-            <span>{TEXT.mute}</span>
+            <span>{t("settings.mute")}</span>
           </label>
           <label className="field volume">
             <span>
-              {TEXT.volume}: {form.alerts.volume}%
+              {t("settings.volume")}: {form.alerts.volume}%
             </span>
             <input
               type="range"
@@ -683,7 +626,8 @@ export function SettingsDialog() {
               onChange={(e) => editAlerts({ volume: Number(e.target.value) })}
             />
           </label>
-          {ALERT_EVENTS.map(({ key, label, overlay }) => {
+          {ALERT_EVENTS.map(({ key, labelKey, overlay }) => {
+            const label = t(labelKey);
             const alerts = form.alerts[key];
             return (
               <fieldset className="alert-event" key={key}>
@@ -694,7 +638,7 @@ export function SettingsDialog() {
                     checked={alerts.notification}
                     onChange={(e) => editEvent(key, { notification: e.target.checked })}
                   />
-                  <span>{TEXT.notification}</span>
+                  <span>{t("settings.notification")}</span>
                 </label>
                 <label className="check">
                   <input
@@ -702,7 +646,7 @@ export function SettingsDialog() {
                     checked={alerts.bring_to_front}
                     onChange={(e) => editEvent(key, { bring_to_front: e.target.checked })}
                   />
-                  <span>{TEXT.bringToFront}</span>
+                  <span>{t("settings.bringToFront")}</span>
                 </label>
                 {overlay && (
                   <div className="overlay-row">
@@ -712,14 +656,14 @@ export function SettingsDialog() {
                         checked={alerts.overlay}
                         onChange={(e) => editEvent(key, { overlay: e.target.checked })}
                       />
-                      <span>{TEXT.overlay}</span>
+                      <span>{t("settings.overlay")}</span>
                     </label>
                     <button
                       type="button"
-                      title={TEXT.previewOverlayHint}
+                      title={t("settings.previewOverlayHint")}
                       onClick={() => overlayApi.preview(overlay).catch(() => undefined)}
                     >
-                      {TEXT.previewOverlay}
+                      {t("settings.previewOverlay")}
                     </button>
                   </div>
                 )}
@@ -730,23 +674,23 @@ export function SettingsDialog() {
                       checked={alerts.sound_enabled}
                       onChange={(e) => editEvent(key, { sound_enabled: e.target.checked })}
                     />
-                    <span>{TEXT.sound}</span>
+                    <span>{t("settings.sound")}</span>
                   </label>
                   <select
-                    aria-label={`${label}: ${TEXT.sound}`}
+                    aria-label={`${label}: ${t("settings.sound")}`}
                     disabled={!alerts.sound_enabled}
                     value={soundKey(alerts.sound)}
                     onChange={(e) => editEvent(key, { sound: soundFromKey(e.target.value) })}
                   >
-                    <optgroup label={TEXT.builtinSounds}>
+                    <optgroup label={t("settings.builtinSounds")}>
                       {(Object.keys(BUILTIN_SOUND_LABELS) as BuiltinSound[]).map((id) => (
                         <option key={id} value={`builtin:${id}`}>
-                          {BUILTIN_SOUND_LABELS[id]}
+                          {t(BUILTIN_SOUND_LABELS[id])}
                         </option>
                       ))}
                     </optgroup>
                     {customSounds.length > 0 && (
-                      <optgroup label={TEXT.yourSounds}>
+                      <optgroup label={t("settings.yourSounds")}>
                         {customSounds.map((file) => (
                           <option key={file} value={`custom:${file}`}>
                             {file}
@@ -758,17 +702,17 @@ export function SettingsDialog() {
                   <button
                     type="button"
                     disabled={form.alerts.muted || !alerts.sound_enabled}
-                    title={form.alerts.muted ? TEXT.testMuted : TEXT.testHint}
+                    title={form.alerts.muted ? t("settings.testMuted") : t("settings.testHint")}
                     onClick={() => testSound(key)}
                   >
-                    {TEXT.test}
+                    {t("settings.test")}
                   </button>
                   <button
                     type="button"
-                    title={TEXT.addFileHint}
+                    title={t("settings.addFileHint")}
                     onClick={() => addSound(key)}
                   >
-                    {TEXT.addFile}
+                    {t("settings.addFile")}
                   </button>
                 </div>
               </fieldset>
@@ -777,8 +721,8 @@ export function SettingsDialog() {
         </section>
 
         <section>
-          <h2>{TEXT.exercises}</h2>
-          <p className="help">{TEXT.exercisesHelp}</p>
+          <h2>{t("settings.exercises")}</h2>
+          <p className="help">{t("settings.exercisesHelp")}</p>
           <ol ref={listRef} className={drag ? "exercises sorting" : "exercises"}>
             {form.exercises.map((exercise, index) => (
               <li
@@ -796,8 +740,8 @@ export function SettingsDialog() {
                 <button
                   type="button"
                   className="icon handle"
-                  title={TEXT.dragHandle}
-                  aria-label={TEXT.dragHandle}
+                  title={t("settings.dragHandle")}
+                  aria-label={t("settings.dragHandle")}
                   onPointerDown={(event) => {
                     if (event.button !== 0) {
                       return;
@@ -832,8 +776,8 @@ export function SettingsDialog() {
                 </button>
                 <input
                   type="text"
-                  placeholder={TEXT.exerciseName}
-                  aria-label={TEXT.exerciseName}
+                  placeholder={t("settings.exerciseName")}
+                  aria-label={t("settings.exerciseName")}
                   maxLength={60}
                   value={exercise.name}
                   onChange={(e) => editExercise(index, { name: e.target.value })}
@@ -841,8 +785,8 @@ export function SettingsDialog() {
                 <input
                   type="text"
                   className="amount"
-                  placeholder={TEXT.exerciseAmount}
-                  aria-label={TEXT.exerciseAmount}
+                  placeholder={t("settings.exerciseAmount")}
+                  aria-label={t("settings.exerciseAmount")}
                   maxLength={60}
                   value={exercise.amount ?? ""}
                   onChange={(e) => editExercise(index, { amount: e.target.value })}
@@ -850,8 +794,8 @@ export function SettingsDialog() {
                 <button
                   type="button"
                   className="icon"
-                  title={TEXT.moveUp}
-                  aria-label={TEXT.moveUp}
+                  title={t("settings.moveUp")}
+                  aria-label={t("settings.moveUp")}
                   disabled={index === 0}
                   onClick={() => moveExercise(index, -1)}
                 >
@@ -860,8 +804,8 @@ export function SettingsDialog() {
                 <button
                   type="button"
                   className="icon"
-                  title={TEXT.moveDown}
-                  aria-label={TEXT.moveDown}
+                  title={t("settings.moveDown")}
+                  aria-label={t("settings.moveDown")}
                   disabled={index === form.exercises.length - 1}
                   onClick={() => moveExercise(index, 1)}
                 >
@@ -870,8 +814,8 @@ export function SettingsDialog() {
                 <button
                   type="button"
                   className="icon"
-                  title={TEXT.remove}
-                  aria-label={TEXT.remove}
+                  title={t("settings.remove")}
+                  aria-label={t("settings.remove")}
                   onClick={() =>
                     change({ exercises: form.exercises.filter((_, i) => i !== index) })
                   }
@@ -887,7 +831,7 @@ export function SettingsDialog() {
             disabled={form.exercises.length >= 50}
             onClick={() => change({ exercises: [...form.exercises, { name: "", amount: null }] })}
           >
-            {TEXT.add}
+            {t("settings.add")}
           </button>
         </section>
       </main>
@@ -899,13 +843,13 @@ export function SettingsDialog() {
         </div>
         <div className="buttons">
           <button type="button" className="secondary left" onClick={resetToClassic}>
-            {TEXT.reset}
+            {t("settings.reset")}
           </button>
           <button type="button" className="secondary" onClick={closeWindow}>
-            {TEXT.cancel}
+            {t("settings.cancel")}
           </button>
           <button type="button" className="primary" disabled={saving} onClick={save}>
-            {saving ? TEXT.saving : TEXT.save}
+            {saving ? t("settings.saving") : t("settings.save")}
           </button>
         </div>
       </footer>

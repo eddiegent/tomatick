@@ -46,6 +46,8 @@ export interface AppSettings {
   /** Start Tomatick when the user logs in. */
   launch_at_login: boolean;
   shortcuts: Shortcuts;
+  /** "system", or the code of a language from /locales. */
+  language: string;
   alerts: AlertSettings;
 }
 

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import "./overlay.css";
@@ -27,7 +28,7 @@ function initialRequest(): Request {
 }
 
 /** Sample content for the preview, so it never reads or changes the timer. */
-function sampleSnapshot(kind: OverlayKind): Snapshot {
+function sampleSnapshot(kind: OverlayKind, label: string): Snapshot {
   const base = {
     state: "running" as const,
     segment: null,
@@ -50,7 +51,7 @@ function sampleSnapshot(kind: OverlayKind): Snapshot {
     phase: "short_break",
     total_ms: 5 * 60_000,
     remaining_ms: 5 * 60_000,
-    label: "Plank (30 s)",
+    label,
   };
 }
 
@@ -78,6 +79,7 @@ function closeWindow() {
 
 /** The full-screen overlay window. */
 export function Overlay() {
+  const { t } = useTranslation();
   const [request, setRequest] = useState<Request>(initialRequest);
   const live = useSnapshot();
   const root = useRef<HTMLDivElement>(null);
@@ -101,8 +103,8 @@ export function Overlay() {
 
   const { kind, preview } = request;
   const snapshot = useMemo(
-    () => (preview ? sampleSnapshot(kind) : live),
-    [preview, kind, live],
+    () => (preview ? sampleSnapshot(kind, t("overlay.sampleExercise")) : live),
+    [preview, kind, live, t],
   );
 
   const stale = !preview && snapshot !== null && isStale(kind, snapshot);
