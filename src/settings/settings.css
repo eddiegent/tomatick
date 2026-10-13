@@ -217,3 +217,65 @@ html.settings-window #root {
 .settings .buttons .left {
   margin-right: auto;
 }
+
+/* ----- alerts ----- */
+
+.settings .volume input[type="range"] {
+  width: 100%;
+  accent-color: var(--accent);
+}
+
+.settings .alert-event {
+  margin: 0 0 10px;
+  padding: 4px 12px 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.settings .alert-event legend {
+  padding: 0 6px;
+  font-weight: 600;
+}
+
+.settings .alert-event .check {
+  margin: 6px 0;
+}
+
+.settings .overlay-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.settings .overlay-row .check {
+  flex: 0 0 auto;
+  margin: 6px 0;
+}
+
+.settings .overlay-row button {
+  flex: 0 0 auto;
+  padding: 6px 10px;
+}
+
+.settings .sound-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.settings .sound-row .check {
+  flex: 0 0 auto;
+  margin: 0;
+}
+
+.settings .sound-row select {
+  flex: 1 1 0;
+  min-width: 0;
+  width: auto;
+}
+
+.settings .sound-row button {
+  flex: 0 0 auto;
+  padding: 6px 10px;
+}

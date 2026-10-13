@@ -11,6 +11,7 @@ use std::path::Path;
 use rusqlite::{Connection, OptionalExtension, params};
 use serde::{Deserialize, Serialize};
 
+use crate::alerts::{AlertError, AlertSettings};
 use crate::engine::{
     COUNTDOWN_SECS_RANGE, DEFAULT_COUNTDOWN_SECS, EngineError, Exercise, TimerSettings,
 };
@@ -40,7 +41,7 @@ const MIGRATIONS: &[&str] = &[
 pub enum StorageError {
     Database(rusqlite::Error),
     Json(serde_json::Error),
-    Invalid(EngineError),
+    Invalid(SettingsError),
     /// The database was written by a newer version of the app.
     TooNew {
         found: usize,
@@ -76,9 +77,39 @@ impl From<serde_json::Error> for StorageError {
     }
 }
 
-impl From<EngineError> for StorageError {
-    fn from(error: EngineError) -> Self {
+impl From<SettingsError> for StorageError {
+    fn from(error: SettingsError) -> Self {
         StorageError::Invalid(error)
+    }
+}
+
+/// A setting that is out of range or otherwise not allowed.
+#[derive(Debug, PartialEq, Eq)]
+pub enum SettingsError {
+    Timer(EngineError),
+    Alerts(AlertError),
+}
+
+impl fmt::Display for SettingsError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            SettingsError::Timer(error) => write!(f, "{error}"),
+            SettingsError::Alerts(error) => write!(f, "{error}"),
+        }
+    }
+}
+
+impl std::error::Error for SettingsError {}
+
+impl From<EngineError> for SettingsError {
+    fn from(error: EngineError) -> Self {
+        SettingsError::Timer(error)
+    }
+}
+
+impl From<AlertError> for SettingsError {
+    fn from(error: AlertError) -> Self {
+        SettingsError::Alerts(error)
     }
 }
 
@@ -100,6 +131,7 @@ pub struct AppSettings {
     pub widget_size: WidgetSize,
     /// Starting value of the countdown timer.
     pub countdown_secs: u32,
+    pub alerts: AlertSettings,
 }
 
 impl Default for AppSettings {
@@ -108,14 +140,17 @@ impl Default for AppSettings {
             timer: TimerSettings::classic(),
             widget_size: WidgetSize::Medium,
             countdown_secs: DEFAULT_COUNTDOWN_SECS,
+            alerts: AlertSettings::default(),
         }
     }
 }
 
 impl AppSettings {
-    pub fn validate(&self) -> Result<(), EngineError> {
+    pub fn validate(&self) -> Result<(), SettingsError> {
         self.timer.validate()?;
-        crate::engine::check_range("countdown_secs", self.countdown_secs, COUNTDOWN_SECS_RANGE)
+        crate::engine::check_range("countdown_secs", self.countdown_secs, COUNTDOWN_SECS_RANGE)?;
+        self.alerts.validate()?;
+        Ok(())
     }
 }
 
@@ -255,6 +290,7 @@ impl Store {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::alerts::SoundChoice;
 
     fn exercise(name: &str, amount: Option<&str>) -> Exercise {
         Exercise {
@@ -327,6 +363,47 @@ mod tests {
                 [],
             )
             .unwrap();
+        assert_eq!(store.load_settings().unwrap(), AppSettings::default());
+    }
+
+    #[test]
+    fn alert_settings_round_trip() {
+        let store = Store::open_in_memory().unwrap();
+        let mut settings = AppSettings::default();
+        settings.alerts.volume = 35;
+        settings.alerts.muted = true;
+        settings.alerts.work_end.notification = false;
+        settings.alerts.work_end.sound = SoundChoice::Custom("gong.mp3".to_string());
+        settings.alerts.countdown_end.bring_to_front = true;
+        store.save_settings(&settings).unwrap();
+        assert_eq!(store.load_settings().unwrap(), settings);
+    }
+
+    #[test]
+    fn settings_saved_before_alerts_existed_get_the_alert_defaults() {
+        let store = Store::open_in_memory().unwrap();
+        store
+            .connection
+            .execute(
+                "INSERT INTO settings (key, value) VALUES ('app', '{\"countdown_secs\": 90}')",
+                [],
+            )
+            .unwrap();
+        let settings = store.load_settings().unwrap();
+        assert_eq!(settings.countdown_secs, 90);
+        assert_eq!(settings.alerts, AlertSettings::default());
+    }
+
+    #[test]
+    fn invalid_alert_settings_are_refused_and_not_stored() {
+        let store = Store::open_in_memory().unwrap();
+        let mut settings = AppSettings::default();
+        settings.alerts.volume = 150;
+        assert!(store.save_settings(&settings).is_err());
+
+        settings = AppSettings::default();
+        settings.alerts.short_break_end.sound = SoundChoice::Custom("../x.mp3".to_string());
+        assert!(store.save_settings(&settings).is_err());
         assert_eq!(store.load_settings().unwrap(), AppSettings::default());
     }
 

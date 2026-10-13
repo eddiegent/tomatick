@@ -2,7 +2,7 @@
 
 A free, open source Pomodoro timer for Windows, macOS and Linux, built around a small always-on-top tomato widget.
 
-> **Status: early development.** There is no released version yet. The design is written down in [SPEC.md](SPEC.md), and the project skeleton (Tauri, React, CI), the timer engine, the tomato widget and the settings dialog are in place. Alerts and history are next.
+> **Status: early development.** There is no released version yet. The design is written down in [SPEC.md](SPEC.md), and the project skeleton (Tauri, React, CI), the timer engine, the tomato widget, the settings dialog, and the alerts (notifications, sounds and the full-screen overlay) are in place. History is next.
 
 ## What it is
 
@@ -30,7 +30,7 @@ Tomatick is a pure timer. No task list, no accounts, no cloud. A tomato sits on 
 
 ## Tech stack
 
-- [Tauri](https://tauri.app) with a Rust core (timer engine, SQLite, audio, notifications, tray, shortcuts)
+- [Tauri](https://tauri.app) with a Rust core (timer engine, SQLite, notifications, tray, shortcuts)
 - React with TypeScript for the UI
 - SQLite for local storage
 - i18next for translations
