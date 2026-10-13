@@ -1,0 +1,218 @@
+/* The statistics window is a normal opaque window. It takes its colors from
+   the `settings-window` theme, which App.tsx also sets for this window. */
+
+.stats {
+  box-sizing: border-box;
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 16px 20px 28px;
+  font-size: 14px;
+  line-height: 1.4;
+  color: var(--text);
+}
+
+.stats header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 16px;
+  margin-bottom: 14px;
+}
+
+.stats h2 {
+  margin: 0 0 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.stats .muted {
+  margin: 4px 0 0;
+  color: var(--muted);
+}
+
+.stats .error {
+  color: var(--danger);
+}
+
+.stats .big {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 650;
+}
+
+.stats .card {
+  margin-bottom: 14px;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel);
+}
+
+.stats .card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.stats .card-head h2 {
+  margin: 0;
+}
+
+.stats .grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0 14px;
+}
+
+.stats .grid .wide {
+  grid-column: 1 / -1;
+}
+
+@media (max-width: 520px) {
+  .stats .grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.stats button {
+  padding: 6px 12px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  color: var(--text);
+  background: var(--bg);
+  font: inherit;
+  cursor: pointer;
+}
+
+.stats button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.stats button.icon {
+  width: 32px;
+  padding: 4px 0;
+  font-size: 18px;
+  line-height: 1;
+}
+
+.stats .segmented {
+  display: inline-flex;
+}
+
+.stats .segmented button {
+  border-radius: 0;
+  margin-left: -1px;
+}
+
+.stats .segmented button:first-child {
+  margin-left: 0;
+  border-radius: 6px 0 0 6px;
+}
+
+.stats .segmented button:last-child {
+  border-radius: 0 6px 6px 0;
+}
+
+.stats .segmented button.on {
+  position: relative;
+  border-color: var(--accent);
+  color: var(--accent-text);
+  background: var(--accent);
+}
+
+.stats .segmented.small button {
+  padding: 3px 9px;
+  font-size: 12px;
+}
+
+.stats .nav {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.stats .range {
+  min-width: 170px;
+  text-align: center;
+  font-weight: 600;
+}
+
+.stats .goal {
+  height: 8px;
+  margin: 10px 0 6px;
+  overflow: hidden;
+  border-radius: 4px;
+  background: var(--line);
+}
+
+.stats .goal-fill {
+  height: 100%;
+  border-radius: 4px;
+  background: var(--accent);
+}
+
+.stats .chart {
+  display: block;
+  width: 100%;
+  height: auto;
+  margin-top: 10px;
+}
+
+.stats .chart .axis {
+  stroke: var(--line);
+  stroke-width: 1;
+}
+
+.stats .chart .bar {
+  fill: var(--accent);
+}
+
+.stats .chart .bar:hover {
+  opacity: 0.8;
+}
+
+.stats .chart .tick {
+  fill: var(--muted);
+  font-size: 11px;
+}
+
+.stats dl {
+  display: grid;
+  grid-template-columns: auto auto;
+  justify-content: space-between;
+  gap: 4px 12px;
+  margin: 0;
+}
+
+.stats dt {
+  color: var(--muted);
+}
+
+.stats dd {
+  margin: 0;
+  font-weight: 600;
+  text-align: right;
+}
+
+.stats dl.columns {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 28px;
+}
+
+.stats dl.columns div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.stats dl.columns dd {
+  font-size: 18px;
+  text-align: left;
+}

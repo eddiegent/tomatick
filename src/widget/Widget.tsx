@@ -4,6 +4,7 @@ import { useAlertSounds } from "../alerts/useAlertSounds";
 import { engine, formatClock, useSnapshot, type Snapshot } from "../engine/api";
 import { formatDuration, parseDuration } from "../engine/duration";
 import { settingsApi, useSettings } from "../settings/api";
+import { statsApi } from "../stats/api";
 import {
   ChartIcon,
   CogIcon,
@@ -34,7 +35,7 @@ const TEXT = {
   reset: "Reset",
   toCountdown: "Switch to countdown",
   toPomodoro: "Switch to Pomodoro",
-  stats: "Statistics (coming soon)",
+  stats: "Statistics",
   settings: "Settings",
   setCountdown: "Click to set the countdown",
   countdownInput: "Countdown duration",
@@ -222,7 +223,13 @@ export function Widget() {
         >
           <SwapIcon />
         </button>
-        <button type="button" className="ctl" aria-label={TEXT.stats} title={TEXT.stats} disabled>
+        <button
+          type="button"
+          className="ctl"
+          aria-label={TEXT.stats}
+          title={TEXT.stats}
+          onClick={() => statsApi.open()}
+        >
           <ChartIcon />
         </button>
         <button

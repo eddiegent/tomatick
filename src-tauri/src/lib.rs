@@ -1,11 +1,12 @@
 pub mod alerts;
 pub mod engine;
+pub mod history;
 pub mod overlay;
 pub mod storage;
 
 use std::sync::{Mutex, MutexGuard};
 use std::thread;
-use std::time::Duration;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use serde::{Deserialize, Serialize};
 use tauri::ipc::Response;
@@ -18,8 +19,9 @@ use tauri_plugin_notification::NotificationExt;
 
 use alerts::{SOUND_EXTENSIONS, SOUNDS_DIR};
 use engine::{Engine, EngineState, Event, Exercise, Mode, Snapshot, SystemClock, TimerSettings};
+use history::{LOCAL_TIME, OpenPhase, Period, Stats, StatsQuery};
 use overlay::{OVERLAY_WINDOW, OverlayKind, overlay_url};
-use storage::{AppSettings, Store, clean_exercises};
+use storage::{AppSettings, DEFAULT_DAILY_GOAL, Store, clean_exercises};
 
 /// How often the engine is ticked.
 const TICK_INTERVAL: Duration = Duration::from_millis(250);
@@ -33,8 +35,15 @@ const ENGINE_EVENT: &str = "engine:event";
 /// Emitted after the settings were saved. Payload: [`SettingsPayload`].
 const SETTINGS_EVENT: &str = "settings:changed";
 
+/// Emitted after a phase was added to the history, for an open statistics
+/// window to refresh itself. No payload.
+const HISTORY_EVENT: &str = "history:changed";
+
 /// Label of the settings window.
 const SETTINGS_WINDOW: &str = "settings";
+
+/// Label of the statistics window.
+const STATS_WINDOW: &str = "stats";
 
 /// Label of the widget window.
 const WIDGET_WINDOW: &str = "main";
@@ -79,8 +88,63 @@ fn publish(app: &AppHandle, events: &[Event], snapshot: &Snapshot) {
         if let Event::Alert { event, label } = event {
             run_alert(app, *event, label.as_deref());
         }
+        record_history(app, event, snapshot);
     }
     let _ = app.emit(STATE_EVENT, snapshot);
+}
+
+fn unix_now_ms() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_or(0, |elapsed| elapsed.as_millis() as u64)
+}
+
+/// Keeps the history: a finished phase is stored, and a started one is noted
+/// so that a crash can still be recorded at the next launch.
+fn record_history(app: &AppHandle, event: &Event, snapshot: &Snapshot) {
+    let recorded = {
+        let store = app.state::<SharedStore>();
+        let store = lock_store(&store);
+        match event {
+            Event::PhaseRecorded(record) => {
+                if let Err(error) = store.record_phase(record) {
+                    eprintln!("Tomatick: cannot record the phase: {error}");
+                }
+                let _ = store.clear_open_phase();
+                true
+            }
+            Event::PhaseStarted { kind } => {
+                let phase = OpenPhase {
+                    kind: *kind,
+                    started_unix_ms: unix_now_ms(),
+                    planned_secs: u32::try_from(snapshot.total_ms / 1000).unwrap_or(u32::MAX),
+                };
+                if let Err(error) = store.set_open_phase(&phase) {
+                    eprintln!("Tomatick: cannot note the running phase: {error}");
+                }
+                false
+            }
+            _ => false,
+        }
+    };
+    if recorded {
+        let _ = app.emit(HISTORY_EVENT, ());
+    }
+}
+
+/// Called when the app quits: a phase in progress is recorded as interrupted.
+fn finish_session(app: &AppHandle) {
+    let events = lock(&app.state::<SharedEngine>()).shutdown();
+    let store = app.state::<SharedStore>();
+    let store = lock_store(&store);
+    for event in events {
+        if let Event::PhaseRecorded(record) = event
+            && let Err(error) = store.record_phase(&record)
+        {
+            eprintln!("Tomatick: cannot record the phase: {error}");
+        }
+    }
+    let _ = store.clear_open_phase();
 }
 
 /// Does the parts of an alert that belong to the system: the notification and
@@ -423,6 +487,46 @@ fn settings_save(
 }
 
 /// Opens the settings window, or brings it to the front if it is open.
+/// The statistics of a day, a week or a month, in the local time.
+#[tauri::command]
+fn stats_get(
+    store: State<'_, SharedStore>,
+    period: Period,
+    offset: i32,
+    week_start: u8,
+) -> Result<Stats, String> {
+    let store = lock_store(&store);
+    let goal = store
+        .load_settings()
+        .map_or(DEFAULT_DAILY_GOAL, |settings| settings.daily_goal);
+    let today = store.local_today().map_err(|e| e.to_string())?;
+    let query = StatsQuery {
+        period,
+        offset,
+        week_start,
+    };
+    store
+        .stats(&query, goal, &today, LOCAL_TIME)
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn stats_open(app: AppHandle) -> Result<(), String> {
+    if let Some(window) = app.get_webview_window(STATS_WINDOW) {
+        let _ = window.unminimize();
+        return window.set_focus().map_err(|e| e.to_string());
+    }
+    WebviewWindowBuilder::new(&app, STATS_WINDOW, WebviewUrl::App("index.html".into()))
+        .title("Tomatick statistics")
+        .inner_size(600.0, 760.0)
+        .min_inner_size(460.0, 520.0)
+        .resizable(true)
+        .center()
+        .build()
+        .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
 #[tauri::command]
 async fn settings_open(app: AppHandle) -> Result<(), String> {
     if let Some(window) = app.get_webview_window(SETTINGS_WINDOW) {
@@ -509,6 +613,11 @@ pub fn run() {
         )
         .setup(|app| {
             let store = open_store(app.handle());
+            // A phase that was running when the app last stopped without
+            // quitting is recorded as interrupted.
+            if let Err(error) = store.recover_open_phase() {
+                eprintln!("Tomatick: cannot recover the last phase: {error}");
+            }
             let engine = build_engine(&store);
             app.manage(Mutex::new(engine));
             app.manage(Mutex::new(store));
@@ -537,8 +646,15 @@ pub fn run() {
             sound_add,
             sound_data,
             settings_open,
+            stats_get,
+            stats_open,
             overlay_preview,
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running Tomatick");
+        .build(tauri::generate_context!())
+        .expect("error while building Tomatick")
+        .run(|app, event| {
+            if let tauri::RunEvent::Exit = event {
+                finish_session(app);
+            }
+        });
 }

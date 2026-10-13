@@ -26,6 +26,7 @@ const TEXT = {
   shortBreak: "Short break (minutes)",
   longBreak: "Long break (minutes)",
   sessions: "Work sessions before a long break",
+  goal: "Daily goal (pomodoros)",
   autoStart: "Start the next phase automatically",
   sleep: "When the computer sleeps or locks",
   sleepPause: "Pause the timer",
@@ -105,6 +106,7 @@ const LIMITS = {
   shortBreak: [1, 60],
   longBreak: [1, 120],
   sessions: [2, 12],
+  goal: [1, 50],
 } as const;
 
 /** The form values, kept as text so that typing is never fought. */
@@ -113,6 +115,7 @@ interface Form {
   shortBreak: string;
   longBreak: string;
   sessions: string;
+  goal: string;
   autoStart: boolean;
   sleep: SleepBehavior;
   size: WidgetSize;
@@ -126,6 +129,7 @@ function toForm(settings: AppSettings, exercises: Exercise[]): Form {
   return {
     ...timerToForm(settings.timer),
     size: settings.widget_size,
+    goal: String(settings.daily_goal),
     countdown: formatDuration(settings.countdown_secs),
     presets: settings.countdown_presets.map(formatDuration).join(", "),
     alerts: settings.alerts,
@@ -183,6 +187,7 @@ function fromForm(form: Form): { settings: AppSettings } | { error: string } {
   const shortBreak = whole(form.shortBreak, LIMITS.shortBreak);
   const longBreak = whole(form.longBreak, LIMITS.longBreak);
   const sessions = whole(form.sessions, LIMITS.sessions);
+  const goal = whole(form.goal, LIMITS.goal);
   const countdown = parseDuration(form.countdown);
   const presets = parsePresets(form.presets);
 
@@ -197,6 +202,9 @@ function fromForm(form: Form): { settings: AppSettings } | { error: string } {
   }
   if (sessions === null) {
     return { error: `Sessions must be a whole number from ${LIMITS.sessions[0]} to ${LIMITS.sessions[1]}.` };
+  }
+  if (goal === null) {
+    return { error: `The daily goal must be a whole number from ${LIMITS.goal[0]} to ${LIMITS.goal[1]}.` };
   }
   if (countdown === null) {
     return { error: "The countdown must be between 0:01 and 23:59:59." };
@@ -219,6 +227,7 @@ function fromForm(form: Form): { settings: AppSettings } | { error: string } {
       widget_size: form.size,
       countdown_secs: countdown,
       countdown_presets: presets,
+      daily_goal: goal,
       alerts: form.alerts,
     },
   };
@@ -425,6 +434,15 @@ export function SettingsDialog() {
                 max={LIMITS.sessions[1]}
                 value={form.sessions}
                 onChange={(e) => change({ sessions: e.target.value })}
+              />
+            </Field>
+            <Field label={TEXT.goal}>
+              <input
+                type="number"
+                min={LIMITS.goal[0]}
+                max={LIMITS.goal[1]}
+                value={form.goal}
+                onChange={(e) => change({ goal: e.target.value })}
               />
             </Field>
           </div>
