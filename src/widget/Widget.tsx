@@ -176,7 +176,8 @@ export function Widget() {
             aria-invalid={invalid}
             title={TEXT.countdownHint}
             onChange={(event) => {
-              setDraft(event.target.value);
+              // Pasted text can hold anything, so keep digits and colons only.
+              setDraft(event.target.value.replace(/[^\d:]/g, ""));
               setInvalid(false);
             }}
             onKeyDown={(event) => {
@@ -184,6 +185,15 @@ export function Widget() {
                 applyCountdown(parseDuration(draft));
               } else if (event.key === "Escape") {
                 setEditing(false);
+              } else if (
+                event.key.length === 1 &&
+                !/[\d:]/.test(event.key) &&
+                !event.ctrlKey &&
+                !event.metaKey &&
+                !event.altKey
+              ) {
+                // A typed character that is not a digit or a colon.
+                event.preventDefault();
               }
             }}
             onBlur={() => setEditing(false)}

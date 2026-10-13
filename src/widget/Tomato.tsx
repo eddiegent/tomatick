@@ -1,17 +1,27 @@
 const LEAF_ANGLES = [-72, -36, 0, 36, 72];
 
+// The tomato body, and the ring that hugs it.
+const BODY = { cx: 50, cy: 53, r: 38 };
+/** Must match `.ring-track` in widget.css. */
+const TRACK_WIDTH = 5;
+/**
+ * The ring has the same center as the body. Its inner edge sits a hair under
+ * the body edge, which is drawn on top, so no gap shows between them.
+ */
+const RING_RADIUS = BODY.r + TRACK_WIDTH / 2 - 0.3;
+
 /**
  * The tomato, its calyx and the progress ring, drawn in a 100 by 100 box.
  * Colors come from CSS variables so the phase theme can restyle it.
  */
 export function Tomato({ progress }: { progress: number }) {
   const arc = {
-    cx: 50,
-    cy: 50,
-    r: 45,
+    cx: BODY.cx,
+    cy: BODY.cy,
+    r: RING_RADIUS,
     pathLength: 100,
     strokeDasharray: `${(progress * 100).toFixed(2)} 100`,
-    transform: "rotate(-90 50 50)",
+    transform: `rotate(-90 ${BODY.cx} ${BODY.cy})`,
   };
 
   return (
@@ -23,7 +33,12 @@ export function Tomato({ progress }: { progress: number }) {
         </radialGradient>
       </defs>
 
-      <circle className="ring-track" cx="50" cy="50" r="45" />
+      <circle
+        className="ring-track"
+        cx={BODY.cx}
+        cy={BODY.cy}
+        r={RING_RADIUS}
+      />
       {progress > 0 && (
         <>
           {/* The white halo keeps the arc readable on any desktop color. */}
@@ -32,7 +47,7 @@ export function Tomato({ progress }: { progress: number }) {
         </>
       )}
 
-      <circle cx="50" cy="53" r="38" fill="url(#tomato-body)" />
+      <circle cx={BODY.cx} cy={BODY.cy} r={BODY.r} fill="url(#tomato-body)" />
       <ellipse
         cx="36"
         cy="39"
