@@ -38,6 +38,8 @@ export interface AppSettings {
   widget_size: WidgetSize;
   /** Starting value of the countdown timer, in seconds. */
   countdown_secs: number;
+  /** Quick-pick countdown durations, in seconds. One to six of them. */
+  countdown_presets: number[];
   alerts: AlertSettings;
 }
 

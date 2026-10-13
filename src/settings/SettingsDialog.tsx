@@ -37,6 +37,9 @@ const TEXT = {
   countdown: "Countdown timer",
   countdownStart: "Starting value",
   countdownHelp: "Minutes, or m:ss (for example 10 or 1:30).",
+  countdownPresets: "Quick choices",
+  countdownPresetsHelp:
+    "One to six durations, separated by commas (for example 5, 10, 15, 30 or 1:30). They appear when you edit the countdown on the widget.",
   alerts: "Alerts",
   alertsHelp:
     "What happens when a phase ends. Sounds play through the app, independent of the system volume.",
@@ -113,6 +116,7 @@ interface Form {
   sleep: SleepBehavior;
   size: WidgetSize;
   countdown: string;
+  presets: string;
   alerts: AlertSettings;
   exercises: Exercise[];
 }
@@ -122,6 +126,7 @@ function toForm(settings: AppSettings, exercises: Exercise[]): Form {
     ...timerToForm(settings.timer),
     size: settings.widget_size,
     countdown: formatDuration(settings.countdown_secs),
+    presets: settings.countdown_presets.map(formatDuration).join(", "),
     alerts: settings.alerts,
     exercises,
   };
@@ -147,6 +152,30 @@ function whole(text: string, [min, max]: readonly [number, number]): number | nu
   return value >= min && value <= max ? value : null;
 }
 
+const MAX_PRESETS = 6;
+
+/** Reads "5, 10, 1:30" into sorted, distinct seconds, or `null`. */
+function parsePresets(text: string): number[] | null {
+  const parts = text
+    .split(",")
+    .map((part) => part.trim())
+    .filter((part) => part !== "");
+  const seconds: number[] = [];
+  for (const part of parts) {
+    const value = parseDuration(part);
+    if (value === null) {
+      return null;
+    }
+    if (!seconds.includes(value)) {
+      seconds.push(value);
+    }
+  }
+  if (seconds.length < 1 || seconds.length > MAX_PRESETS) {
+    return null;
+  }
+  return seconds.sort((a, b) => a - b);
+}
+
 /** Turns the form into settings, or returns the first problem found. */
 function fromForm(form: Form): { settings: AppSettings } | { error: string } {
   const work = whole(form.work, LIMITS.work);
@@ -154,6 +183,7 @@ function fromForm(form: Form): { settings: AppSettings } | { error: string } {
   const longBreak = whole(form.longBreak, LIMITS.longBreak);
   const sessions = whole(form.sessions, LIMITS.sessions);
   const countdown = parseDuration(form.countdown);
+  const presets = parsePresets(form.presets);
 
   if (work === null) {
     return { error: `Work must be a whole number from ${LIMITS.work[0]} to ${LIMITS.work[1]} minutes.` };
@@ -170,6 +200,11 @@ function fromForm(form: Form): { settings: AppSettings } | { error: string } {
   if (countdown === null) {
     return { error: "The countdown must be between 0:01 and 23:59:59." };
   }
+  if (presets === null) {
+    return {
+      error: `Quick choices must be one to ${MAX_PRESETS} durations between 0:01 and 23:59:59, separated by commas.`,
+    };
+  }
   return {
     settings: {
       timer: {
@@ -182,6 +217,7 @@ function fromForm(form: Form): { settings: AppSettings } | { error: string } {
       },
       widget_size: form.size,
       countdown_secs: countdown,
+      countdown_presets: presets,
       alerts: form.alerts,
     },
   };
@@ -404,6 +440,14 @@ export function SettingsDialog() {
             />
           </Field>
           <p className="help">{TEXT.countdownHelp}</p>
+          <Field label={TEXT.countdownPresets}>
+            <input
+              type="text"
+              value={form.presets}
+              onChange={(e) => change({ presets: e.target.value })}
+            />
+          </Field>
+          <p className="help">{TEXT.countdownPresetsHelp}</p>
         </section>
 
         <section>

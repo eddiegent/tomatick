@@ -195,12 +195,22 @@ fn with_engine(
     engine: &SharedEngine,
     action: impl FnOnce(&mut Engine<SystemClock>) -> Vec<Event>,
 ) {
-    let (events, snapshot) = {
+    let (events, snapshot, rotation) = {
         let mut engine = lock(engine);
         let events = action(&mut engine);
-        (events, engine.snapshot())
+        (events, engine.snapshot(), engine.rotation_position())
     };
+    remember_rotation(app, rotation);
     publish(app, &events, &snapshot);
+}
+
+/// Saves where the exercise rotation stands, so it carries on after a
+/// restart. Nothing is written when the position has not changed.
+fn remember_rotation(app: &AppHandle, position: usize) {
+    let store = app.state::<SharedStore>();
+    if let Err(error) = lock_store(&store).save_rotation(position) {
+        eprintln!("Tomatick: cannot save the exercise rotation: {error}");
+    }
 }
 
 /// Like [`with_engine`] for commands that can fail validation. The new state
@@ -210,11 +220,12 @@ fn run_checked<E: ToString>(
     engine: &SharedEngine,
     action: impl FnOnce(&mut Engine<SystemClock>) -> Result<(), E>,
 ) -> Result<(), String> {
-    let (result, snapshot) = {
+    let (result, snapshot, rotation) = {
         let mut engine = lock(engine);
         let result = action(&mut engine);
-        (result, engine.snapshot())
+        (result, engine.snapshot(), engine.rotation_position())
     };
+    remember_rotation(app, rotation);
     publish(app, &[], &snapshot);
     result.map_err(|error| error.to_string())
 }
@@ -435,11 +446,16 @@ fn spawn_ticker(app: AppHandle) {
         loop {
             thread::sleep(TICK_INTERVAL);
             let engine = app.state::<SharedEngine>();
-            let (events, snapshot) = {
+            let (events, snapshot, rotation) = {
                 let mut engine = lock(&engine);
                 let events = engine.tick();
-                (events, engine.snapshot())
+                (events, engine.snapshot(), engine.rotation_position())
             };
+            // The rotation only moves when something happens, so the
+            // database is left alone on a quiet tick.
+            if !events.is_empty() {
+                remember_rotation(&app, rotation);
+            }
             if !events.is_empty() || snapshot.state == EngineState::Running {
                 publish(&app, &events, &snapshot);
             }
@@ -474,6 +490,7 @@ fn build_engine(store: &Store) -> Engine<SystemClock> {
         .or_else(|_| Engine::new(SystemClock::new(), TimerSettings::classic(), Vec::new()))
         .expect("the classic settings are valid");
     let _ = engine.set_countdown(settings.countdown_secs);
+    engine.restore_rotation(store.load_rotation().unwrap_or(0));
     engine
 }
 
