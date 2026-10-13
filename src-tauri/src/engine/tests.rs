@@ -787,6 +787,23 @@ fn auto_pause_holds_the_timer_until_the_user_resumes() {
 }
 
 #[test]
+fn a_suspend_noticed_on_wake_pauses_as_of_when_it_began() {
+    let mut h = Harness::new(classic());
+    h.engine.start();
+    h.run(100);
+    let began = h.engine.now_ms();
+    h.advance(3600);
+    // Nobody ticked during the sleep, so the timer still thinks it runs.
+    h.engine.on_system_suspend_at(began);
+    assert_eq!(h.snap().state, EngineState::AutoPaused);
+    assert_eq!(h.snap().remaining_ms, 1_400_000);
+
+    h.engine.resume();
+    let events = h.run(1400);
+    assert_eq!(records(&events)[0].paused_secs, 3600);
+}
+
+#[test]
 fn suspend_does_nothing_to_a_timer_that_is_not_running() {
     let mut h = Harness::new(classic());
     h.engine.on_system_suspend();

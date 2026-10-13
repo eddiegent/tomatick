@@ -249,14 +249,28 @@ impl<C: Clock> Engine<C> {
     /// nothing happens: the host just keeps calling [`Engine::tick`] after
     /// waking up.
     pub fn on_system_suspend(&mut self) {
+        let now = self.clock.now_ms();
+        self.on_system_suspend_at(now);
+    }
+
+    /// Like [`Engine::on_system_suspend`] for a suspend that is noticed
+    /// afterwards, on wake. `at_ms` is on the engine clock (see
+    /// [`Engine::now_ms`]): the timer is paused as of that instant, so the
+    /// time asleep counts as paused time, not as running time.
+    pub fn on_system_suspend_at(&mut self, at_ms: u64) {
         if self.settings.sleep_behavior != SleepBehavior::AutoPause {
             return;
         }
-        let now = self.clock.now_ms();
+        let at = at_ms.min(self.clock.now_ms());
         let timer = self.active_timer_mut();
         if timer.is_running() {
-            timer.pause(now, true);
+            timer.pause(at, true);
         }
+    }
+
+    /// The engine clock, in milliseconds. Only differences matter.
+    pub fn now_ms(&self) -> u64 {
+        self.clock.now_ms()
     }
 
     /// Call when the app is about to quit. A phase in progress is recorded as
