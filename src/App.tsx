@@ -1,5 +1,7 @@
 import { useEffect } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import i18n, { resolveLanguage } from "./i18n";
+import { useSettings } from "./settings/api";
 import "./App.css";
 import { Overlay } from "./overlay/Overlay";
 import { SettingsDialog } from "./settings/SettingsDialog";
@@ -20,6 +22,22 @@ function App() {
   const settings = label === "settings";
   const stats = label === "stats";
   const overlay = label === "overlay";
+
+  // The language follows the setting, in every window.
+  const language = useSettings()?.settings.language;
+  useEffect(() => {
+    if (language !== undefined) {
+      void i18n.changeLanguage(resolveLanguage(language));
+    }
+  }, [language]);
+  useEffect(() => {
+    const apply = (lng: string) => {
+      document.documentElement.lang = lng;
+    };
+    apply(i18n.language);
+    i18n.on("languageChanged", apply);
+    return () => i18n.off("languageChanged", apply);
+  }, []);
 
   useEffect(() => {
     // The settings and statistics windows share the opaque window theme.

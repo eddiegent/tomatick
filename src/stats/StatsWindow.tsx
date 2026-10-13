@@ -1,43 +1,8 @@
 import { useEffect, useState } from "react";
+import type { TFunction } from "i18next";
+import { useTranslation } from "react-i18next";
 import "./stats.css";
 import { useStats, type Period, type Stats } from "./api";
-
-// English only for now. The text moves to the translation files in
-// milestone 10.
-const TEXT = {
-  title: "Statistics",
-  day: "Day",
-  week: "Week",
-  month: "Month",
-  previous: "Previous",
-  next: "Next",
-  today: "Today",
-  goalOf: (done: number, goal: number) => `${done} of ${goal} pomodoros`,
-  goalReached: "Goal reached",
-  focusTime: "Focus time",
-  pomodoros: "Pomodoros",
-  chartBy: "Show",
-  streak: "Streak",
-  currentStreak: "Current",
-  longestStreak: "Longest",
-  days: (n: number) => (n === 1 ? "1 day" : `${n} days`),
-  completionRate: "Completion rate",
-  completionNone: "No work phases yet",
-  completed: "completed",
-  skipped: "skipped",
-  interrupted: "interrupted",
-  totals: "Totals",
-  totalPomodoros: "Pomodoros",
-  totalFocus: "Focus time",
-  activeDays: "Active days",
-  averageFocus: "Average per active day",
-  bestTime: "Best time of day",
-  bestTimeHelp: "Completed pomodoros by the hour they started.",
-  empty: "No pomodoros in this period yet.",
-  loading: "Loading",
-  hour: (hour: number) => `${hour}:00`,
-  chartLabel: (what: string, title: string) => `${what}, ${title}`,
-};
 
 type Metric = "completed" | "focus";
 
@@ -47,12 +12,12 @@ function parseDay(text: string): Date {
   return new Date(year, month - 1, day);
 }
 
-function periodTitle(stats: Stats): string {
+function periodTitle(stats: Stats, locale: string, t: TFunction): string {
   const start = parseDay(stats.start);
   const end = parseDay(stats.end);
   switch (stats.period) {
     case "day":
-      return start.toLocaleDateString(undefined, {
+      return start.toLocaleDateString(locale, {
         weekday: "long",
         day: "numeric",
         month: "long",
@@ -60,35 +25,41 @@ function periodTitle(stats: Stats): string {
       });
     case "week": {
       const short = { day: "numeric", month: "short" } as const;
-      return `${start.toLocaleDateString(undefined, short)} to ${end.toLocaleDateString(undefined, { ...short, year: "numeric" })}`;
+      return t("stats.range", {
+        start: start.toLocaleDateString(locale, short),
+        end: end.toLocaleDateString(locale, { ...short, year: "numeric" }),
+      });
     }
     case "month":
-      return start.toLocaleDateString(undefined, { month: "long", year: "numeric" });
+      return start.toLocaleDateString(locale, { month: "long", year: "numeric" });
   }
 }
 
 /** `2 h 05 min`, `45 min`, or `0 min`. */
-export function formatFocus(seconds: number): string {
+export function formatFocus(seconds: number, t: TFunction): string {
   const minutes = Math.round(seconds / 60);
   const hours = Math.floor(minutes / 60);
   const rest = minutes % 60;
   if (hours === 0) {
-    return `${rest} min`;
+    return t("stats.focusM", { minutes: rest });
   }
-  return `${hours} h ${String(rest).padStart(2, "0")} min`;
+  return t("stats.focusHm", { hours, minutes: String(rest).padStart(2, "0") });
 }
 
-function percent(part: number, whole: number): number {
-  return whole === 0 ? 0 : Math.round((part / whole) * 100);
+/** `73%`, or `73 %` where the language writes it that way. */
+function percent(part: number, whole: number, locale: string): string {
+  return new Intl.NumberFormat(locale, { style: "percent", maximumFractionDigits: 0 }).format(
+    whole === 0 ? 0 : part / whole,
+  );
 }
 
 /** The label under a bar, or an empty string for the bars that go without. */
-function barLabel(period: Period, key: string, index: number): string {
+function barLabel(period: Period, key: string, index: number, locale: string): string {
   switch (period) {
     case "day":
       return index % 3 === 0 ? String(Number(key)) : "";
     case "week":
-      return parseDay(key).toLocaleDateString(undefined, { weekday: "short" });
+      return parseDay(key).toLocaleDateString(locale, { weekday: "short" });
     case "month": {
       const day = Number(key.slice(8));
       return day === 1 || day % 5 === 0 ? String(day) : "";
@@ -96,11 +67,11 @@ function barLabel(period: Period, key: string, index: number): string {
   }
 }
 
-function barTitle(period: Period, key: string): string {
+function barTitle(period: Period, key: string, locale: string, t: TFunction): string {
   if (period === "day") {
-    return TEXT.hour(Number(key));
+    return t("stats.hour", { hour: Number(key) });
   }
-  return parseDay(key).toLocaleDateString(undefined, {
+  return parseDay(key).toLocaleDateString(locale, {
     weekday: "short",
     day: "numeric",
     month: "short",
@@ -163,12 +134,13 @@ function BarChart({ bars, label, compact }: { bars: Bar[]; label: string; compac
 }
 
 function Today({ stats }: { stats: Stats }) {
+  const { t } = useTranslation();
   const { completed, goal, focus_secs } = stats.today;
   const ratio = Math.min(1, completed / Math.max(1, goal));
   return (
     <section className="card today">
-      <h2>{TEXT.today}</h2>
-      <p className="big">{TEXT.goalOf(completed, goal)}</p>
+      <h2>{t("stats.today")}</h2>
+      <p className="big">{t("stats.goalOf", { done: completed, goal })}</p>
       <div
         className="goal"
         role="progressbar"
@@ -179,8 +151,8 @@ function Today({ stats }: { stats: Stats }) {
         <div className="goal-fill" style={{ width: `${ratio * 100}%` }} />
       </div>
       <p className="muted">
-        {TEXT.focusTime}: {formatFocus(focus_secs)}
-        {completed >= goal ? ` · ${TEXT.goalReached}` : ""}
+        {t("stats.focusTime")}: {formatFocus(focus_secs, t)}
+        {completed >= goal ? ` · ${t("stats.goalReached")}` : ""}
       </p>
     </section>
   );
@@ -188,14 +160,16 @@ function Today({ stats }: { stats: Stats }) {
 
 /** The statistics window, opened from the chart button of the widget. */
 export function StatsWindow() {
+  const { t, i18n } = useTranslation();
+  const locale = i18n.language;
   const [period, setPeriod] = useState<Period>("week");
   const [offset, setOffset] = useState(0);
   const [metric, setMetric] = useState<Metric>("completed");
-  const { stats, error } = useStats(period, offset);
+  const { stats, error } = useStats(period, offset, locale);
 
   useEffect(() => {
-    document.title = TEXT.title;
-  }, []);
+    document.title = t("stats.title");
+  }, [t]);
 
   const choose = (next: Period) => {
     setPeriod(next);
@@ -205,25 +179,25 @@ export function StatsWindow() {
   if (!stats) {
     return (
       <div className="stats">
-        <p className={error ? "error" : "muted"}>{error ?? TEXT.loading}</p>
+        <p className={error ? "error" : "muted"}>{error ?? t("stats.loading")}</p>
       </div>
     );
   }
 
-  const title = periodTitle(stats);
+  const title = periodTitle(stats, locale, t);
   const bars: Bar[] = stats.buckets.map((bucket, index) => ({
-    label: barLabel(stats.period, bucket.key, index),
-    title: barTitle(stats.period, bucket.key),
+    label: barLabel(stats.period, bucket.key, index, locale),
+    title: barTitle(stats.period, bucket.key, locale, t),
     value: metric === "completed" ? bucket.completed : bucket.focus_secs,
     text:
       metric === "completed"
         ? String(bucket.completed)
-        : formatFocus(bucket.focus_secs),
+        : formatFocus(bucket.focus_secs, t),
   }));
   const works = stats.completion.completed + stats.completion.skipped + stats.completion.interrupted;
   const bestHours: Bar[] = stats.hours.map((count, hour) => ({
     label: hour % 3 === 0 ? String(hour) : "",
-    title: TEXT.hour(hour),
+    title: t("stats.hour", { hour }),
     value: count,
     text: String(count),
   }));
@@ -232,7 +206,7 @@ export function StatsWindow() {
   return (
     <div className="stats">
       <header>
-        <div className="segmented" role="radiogroup" aria-label={TEXT.title}>
+        <div className="segmented" role="radiogroup" aria-label={t("stats.title")}>
           {(["day", "week", "month"] as const).map((value) => (
             <button
               key={value}
@@ -242,7 +216,7 @@ export function StatsWindow() {
               className={period === value ? "on" : undefined}
               onClick={() => choose(value)}
             >
-              {TEXT[value]}
+              {t(`stats.${value}`)}
             </button>
           ))}
         </div>
@@ -250,8 +224,8 @@ export function StatsWindow() {
           <button
             type="button"
             className="icon"
-            title={TEXT.previous}
-            aria-label={TEXT.previous}
+            title={t("stats.previous")}
+            aria-label={t("stats.previous")}
             onClick={() => setOffset(offset - 1)}
           >
             {"‹"}
@@ -262,8 +236,8 @@ export function StatsWindow() {
           <button
             type="button"
             className="icon"
-            title={TEXT.next}
-            aria-label={TEXT.next}
+            title={t("stats.next")}
+            aria-label={t("stats.next")}
             disabled={offset >= 0}
             onClick={() => setOffset(offset + 1)}
           >
@@ -276,8 +250,8 @@ export function StatsWindow() {
 
       <section className="card">
         <div className="card-head">
-          <h2>{metric === "completed" ? TEXT.pomodoros : TEXT.focusTime}</h2>
-          <div className="segmented small" role="radiogroup" aria-label={TEXT.chartBy}>
+          <h2>{metric === "completed" ? t("stats.pomodoros") : t("stats.focusTime")}</h2>
+          <div className="segmented small" role="radiogroup" aria-label={t("stats.chartBy")}>
             {(["completed", "focus"] as const).map((value) => (
               <button
                 key={value}
@@ -287,71 +261,77 @@ export function StatsWindow() {
                 className={metric === value ? "on" : undefined}
                 onClick={() => setMetric(value)}
               >
-                {value === "completed" ? TEXT.pomodoros : TEXT.focusTime}
+                {value === "completed" ? t("stats.pomodoros") : t("stats.focusTime")}
               </button>
             ))}
           </div>
         </div>
         <BarChart
           bars={bars}
-          label={TEXT.chartLabel(metric === "completed" ? TEXT.pomodoros : TEXT.focusTime, title)}
+          label={t("stats.chartLabel", {
+            what: metric === "completed" ? t("stats.pomodoros") : t("stats.focusTime"),
+            title,
+          })}
         />
-        {empty && <p className="muted">{TEXT.empty}</p>}
+        {empty && <p className="muted">{t("stats.empty")}</p>}
       </section>
 
       <div className="grid">
         <section className="card">
-          <h2>{TEXT.streak}</h2>
+          <h2>{t("stats.streak")}</h2>
           <dl>
-            <dt>{TEXT.currentStreak}</dt>
-            <dd>{TEXT.days(stats.streak.current)}</dd>
-            <dt>{TEXT.longestStreak}</dt>
-            <dd>{TEXT.days(stats.streak.longest)}</dd>
+            <dt>{t("stats.currentStreak")}</dt>
+            <dd>{t("stats.days", { count: stats.streak.current })}</dd>
+            <dt>{t("stats.longestStreak")}</dt>
+            <dd>{t("stats.days", { count: stats.streak.longest })}</dd>
           </dl>
         </section>
 
         <section className="card">
-          <h2>{TEXT.completionRate}</h2>
+          <h2>{t("stats.completionRate")}</h2>
           {works === 0 ? (
-            <p className="muted">{TEXT.completionNone}</p>
+            <p className="muted">{t("stats.completionNone")}</p>
           ) : (
             <>
-              <p className="big">{percent(stats.completion.completed, works)}%</p>
+              <p className="big">{percent(stats.completion.completed, works, locale)}</p>
               <p className="muted">
-                {stats.completion.completed} {TEXT.completed}, {stats.completion.skipped}{" "}
-                {TEXT.skipped}, {stats.completion.interrupted} {TEXT.interrupted}
+                {t("stats.completionDetail", {
+                  completed: stats.completion.completed,
+                  skipped: stats.completion.skipped,
+                  interrupted: stats.completion.interrupted,
+                })}
               </p>
             </>
           )}
         </section>
 
         <section className="card wide">
-          <h2>{TEXT.totals}</h2>
+          <h2>{t("stats.totals")}</h2>
           <dl className="columns">
             <div>
-              <dt>{TEXT.totalPomodoros}</dt>
+              <dt>{t("stats.totalPomodoros")}</dt>
               <dd>{stats.totals.completed}</dd>
             </div>
             <div>
-              <dt>{TEXT.totalFocus}</dt>
-              <dd>{formatFocus(stats.totals.focus_secs)}</dd>
+              <dt>{t("stats.totalFocus")}</dt>
+              <dd>{formatFocus(stats.totals.focus_secs, t)}</dd>
             </div>
             <div>
-              <dt>{TEXT.activeDays}</dt>
+              <dt>{t("stats.activeDays")}</dt>
               <dd>{stats.totals.active_days}</dd>
             </div>
             <div>
-              <dt>{TEXT.averageFocus}</dt>
-              <dd>{formatFocus(stats.totals.average_focus_secs)}</dd>
+              <dt>{t("stats.averageFocus")}</dt>
+              <dd>{formatFocus(stats.totals.average_focus_secs, t)}</dd>
             </div>
           </dl>
         </section>
       </div>
 
       <section className="card">
-        <h2>{TEXT.bestTime}</h2>
-        <p className="muted">{TEXT.bestTimeHelp}</p>
-        <BarChart bars={bestHours} label={`${TEXT.bestTime}, ${title}`} compact />
+        <h2>{t("stats.bestTime")}</h2>
+        <p className="muted">{t("stats.bestTimeHelp")}</p>
+        <BarChart bars={bestHours} label={`${t("stats.bestTime")}, ${title}`} compact />
       </section>
     </div>
   );
