@@ -5,7 +5,8 @@ import type { AlertSettings } from "../settings/api";
 import { playSound } from "./sound";
 
 /**
- * Plays the sound of each alert the engine raises. Only the widget window
+ * Plays the sound of each alert the engine raises, and a light cue when a
+ * long break moves to its next segment. Only the widget window
  * uses this, so a sound is played once. It always reads the latest settings
  * without listening again.
  */
@@ -20,14 +21,16 @@ export function useAlertSounds(alerts: AlertSettings | undefined) {
     let unlisten: UnlistenFn | undefined;
 
     onEngineEvent((event) => {
-      if (event.type !== "alert") {
+      if (event.type !== "alert" && event.type !== "segment_changed") {
         return;
       }
       const settings = latest.current;
       if (!settings || settings.muted || settings.volume === 0) {
         return;
       }
-      const config = settings[event.event];
+      // Moving to the next segment of a long break is only a light cue: the
+      // sound of the end of a short break, with no notification or overlay.
+      const config = settings[event.type === "alert" ? event.event : "short_break_end"];
       if (!config.sound_enabled) {
         return;
       }

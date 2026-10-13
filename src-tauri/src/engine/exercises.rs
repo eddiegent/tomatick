@@ -49,6 +49,21 @@ impl Rotation {
         self.items.len()
     }
 
+    /// Index of the exercise that comes next, for saving between launches.
+    pub fn position(&self) -> usize {
+        self.next
+    }
+
+    /// Puts the rotation back where it was. A position that no longer fits
+    /// the list restarts at the first exercise.
+    pub fn set_position(&mut self, position: usize) {
+        self.next = if position < self.items.len() {
+            position
+        } else {
+            0
+        };
+    }
+
     pub fn is_empty(&self) -> bool {
         self.items.is_empty()
     }

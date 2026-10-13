@@ -43,9 +43,6 @@ const TEXT = {
   autoPaused: "Paused by the system",
 };
 
-/** Quick choices for the countdown, in seconds. */
-const COUNTDOWN_PRESETS = [5 * 60, 10 * 60, 15 * 60, 30 * 60];
-
 function playLabel(snapshot: Snapshot): string {
   switch (snapshot.state) {
     case "running":
@@ -199,7 +196,7 @@ export function Widget() {
             onBlur={() => setEditing(false)}
           />
           <div className="presets">
-            {COUNTDOWN_PRESETS.map((seconds) => (
+            {settings.settings.countdown_presets.map((seconds) => (
               <button
                 key={seconds}
                 type="button"
@@ -208,7 +205,7 @@ export function Widget() {
                 onMouseDown={(event) => event.preventDefault()}
                 onClick={() => applyCountdown(seconds)}
               >
-                {seconds / 60}
+                {formatDuration(seconds)}
               </button>
             ))}
           </div>

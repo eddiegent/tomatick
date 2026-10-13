@@ -408,6 +408,53 @@ fn toggle_starts_pauses_and_resumes() {
     assert_eq!(h.snap().state, EngineState::Running);
 }
 
+// ----- rotation position -----
+
+#[test]
+fn the_rotation_position_can_be_saved_and_restored() {
+    let exercises = vec![
+        Exercise {
+            name: "A".into(),
+            amount: None,
+        },
+        Exercise {
+            name: "B".into(),
+            amount: None,
+        },
+        Exercise {
+            name: "C".into(),
+            amount: None,
+        },
+    ];
+    let mut h = Harness::with_exercises(classic(), exercises.clone());
+    h.complete(1500);
+    assert_eq!(h.snap().label.as_deref(), Some("A"));
+    assert_eq!(h.engine.rotation_position(), 1);
+
+    // A new session, as after a restart.
+    let mut next = Harness::with_exercises(classic(), exercises);
+    next.engine.restore_rotation(h.engine.rotation_position());
+    next.complete(1500);
+    assert_eq!(next.snap().label.as_deref(), Some("B"));
+}
+
+#[test]
+fn a_saved_position_beyond_the_list_restarts_the_rotation() {
+    let exercises = vec![
+        Exercise {
+            name: "A".into(),
+            amount: None,
+        },
+        Exercise {
+            name: "B".into(),
+            amount: None,
+        },
+    ];
+    let mut h = Harness::with_exercises(classic(), exercises);
+    h.engine.restore_rotation(5);
+    assert_eq!(h.engine.rotation_position(), 0);
+}
+
 // ----- skip -----
 
 #[test]

@@ -18,6 +18,13 @@ use crate::engine::{
 
 /// The key under which [`AppSettings`] is stored in the `settings` table.
 const SETTINGS_KEY: &str = "app";
+/// The key under which the position in the exercise rotation is stored.
+const ROTATION_KEY: &str = "rotation";
+
+/// The countdown presets of a fresh install: 5, 10, 15 and 30 minutes.
+pub const DEFAULT_COUNTDOWN_PRESETS: [u32; 4] = [5 * 60, 10 * 60, 15 * 60, 30 * 60];
+/// How many countdown presets can be kept.
+pub const COUNTDOWN_PRESETS_COUNT: (u32, u32) = (1, 6);
 
 /// Longest exercise name or amount that is kept.
 const MAX_TEXT_CHARS: usize = 60;
@@ -131,6 +138,8 @@ pub struct AppSettings {
     pub widget_size: WidgetSize,
     /// Starting value of the countdown timer.
     pub countdown_secs: u32,
+    /// The quick-pick durations shown when the countdown is edited, in seconds.
+    pub countdown_presets: Vec<u32>,
     pub alerts: AlertSettings,
 }
 
@@ -140,6 +149,7 @@ impl Default for AppSettings {
             timer: TimerSettings::classic(),
             widget_size: WidgetSize::Medium,
             countdown_secs: DEFAULT_COUNTDOWN_SECS,
+            countdown_presets: DEFAULT_COUNTDOWN_PRESETS.to_vec(),
             alerts: AlertSettings::default(),
         }
     }
@@ -149,6 +159,14 @@ impl AppSettings {
     pub fn validate(&self) -> Result<(), SettingsError> {
         self.timer.validate()?;
         crate::engine::check_range("countdown_secs", self.countdown_secs, COUNTDOWN_SECS_RANGE)?;
+        crate::engine::check_range(
+            "countdown_presets (how many)",
+            self.countdown_presets.len() as u32,
+            COUNTDOWN_PRESETS_COUNT,
+        )?;
+        for preset in &self.countdown_presets {
+            crate::engine::check_range("countdown_presets", *preset, COUNTDOWN_SECS_RANGE)?;
+        }
         self.alerts.validate()?;
         Ok(())
     }
@@ -254,6 +272,30 @@ impl Store {
         Ok(())
     }
 
+    /// Where the exercise rotation stood when the app last ran, or 0.
+    pub fn load_rotation(&self) -> Result<usize, StorageError> {
+        let stored: Option<String> = self
+            .connection
+            .query_row(
+                "SELECT value FROM settings WHERE key = ?1",
+                params![ROTATION_KEY],
+                |row| row.get(0),
+            )
+            .optional()?;
+        Ok(stored.and_then(|text| text.parse().ok()).unwrap_or(0))
+    }
+
+    /// Remembers the rotation position. Writes nothing when it is unchanged.
+    pub fn save_rotation(&self, position: usize) -> Result<(), StorageError> {
+        self.connection.execute(
+            "INSERT INTO settings (key, value) VALUES (?1, ?2)
+             ON CONFLICT(key) DO UPDATE SET value = excluded.value
+             WHERE value != excluded.value",
+            params![ROTATION_KEY, position.to_string()],
+        )?;
+        Ok(())
+    }
+
     pub fn load_exercises(&self) -> Result<Vec<Exercise>, StorageError> {
         let mut statement = self
             .connection
@@ -307,6 +349,80 @@ mod tests {
         assert_eq!(settings.timer, TimerSettings::classic());
         assert_eq!(settings.countdown_secs, 600);
         assert!(store.load_exercises().unwrap().is_empty());
+    }
+
+    #[test]
+    fn rotation_position_round_trips_and_defaults_to_zero() {
+        let store = Store::open_in_memory().unwrap();
+        assert_eq!(store.load_rotation().unwrap(), 0);
+        store.save_rotation(3).unwrap();
+        assert_eq!(store.load_rotation().unwrap(), 3);
+        store.save_rotation(3).unwrap();
+        store.save_rotation(1).unwrap();
+        assert_eq!(store.load_rotation().unwrap(), 1);
+    }
+
+    #[test]
+    fn rotation_position_does_not_disturb_the_settings() {
+        let store = Store::open_in_memory().unwrap();
+        let settings = AppSettings::default();
+        store.save_settings(&settings).unwrap();
+        store.save_rotation(2).unwrap();
+        assert_eq!(store.load_settings().unwrap(), settings);
+    }
+
+    #[test]
+    fn countdown_presets_default_to_5_10_15_and_30_minutes() {
+        let settings = AppSettings::default();
+        assert_eq!(settings.countdown_presets, vec![300, 600, 900, 1800]);
+    }
+
+    #[test]
+    fn settings_saved_before_presets_existed_get_the_default_presets() {
+        let store = Store::open_in_memory().unwrap();
+        store
+            .connection
+            .execute(
+                "INSERT INTO settings (key, value) VALUES ('app', '{\"countdown_secs\": 90}')",
+                [],
+            )
+            .unwrap();
+        let settings = store.load_settings().unwrap();
+        assert_eq!(settings.countdown_secs, 90);
+        assert_eq!(settings.countdown_presets, vec![300, 600, 900, 1800]);
+    }
+
+    #[test]
+    fn countdown_presets_round_trip() {
+        let store = Store::open_in_memory().unwrap();
+        let settings = AppSettings {
+            countdown_presets: vec![90, 20 * 60],
+            ..AppSettings::default()
+        };
+        store.save_settings(&settings).unwrap();
+        assert_eq!(
+            store.load_settings().unwrap().countdown_presets,
+            vec![90, 1200]
+        );
+    }
+
+    #[test]
+    fn countdown_presets_are_validated() {
+        let with = |countdown_presets: Vec<u32>| AppSettings {
+            countdown_presets,
+            ..AppSettings::default()
+        };
+        assert!(with(Vec::new()).validate().is_err(), "at least one preset");
+        assert!(with(vec![60; 7]).validate().is_err(), "at most six presets");
+        assert!(
+            with(vec![60, 0]).validate().is_err(),
+            "a preset lasts a second"
+        );
+        assert!(
+            with(vec![24 * 60 * 60]).validate().is_err(),
+            "a preset stays under 24 hours"
+        );
+        assert!(with(vec![24 * 60 * 60 - 1]).validate().is_ok());
     }
 
     #[test]

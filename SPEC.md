@@ -144,7 +144,7 @@ If the app quits or crashes during a phase, that phase is recorded as `interrupt
 
 - One countdown at a time.
 - The user sets the duration by clicking the digital display and typing a time (for example `10:00`, up to `23:59:59`), or by choosing a preset.
-- Presets default to 5, 10 and 15 minutes. They are editable in the configuration dialog.
+- Presets default to 5, 10, 15 and 30 minutes. One to six of them can be kept, and they are editable in the configuration dialog.
 - Controls: start, pause, resume, reset. Skip does not apply.
 - At zero, the app fires the "countdown end" alert (section 8).
 - Countdowns are not recorded in history or statistics.

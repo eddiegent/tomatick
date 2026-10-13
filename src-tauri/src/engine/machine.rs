@@ -233,6 +233,17 @@ impl<C: Clock> Engine<C> {
         self.rotation.set_items(exercises);
     }
 
+    /// Index of the exercise that comes next in the rotation. The host saves
+    /// it so the rotation carries on after a restart.
+    pub fn rotation_position(&self) -> usize {
+        self.rotation.position()
+    }
+
+    /// Restores a saved rotation position.
+    pub fn restore_rotation(&mut self, position: usize) {
+        self.rotation.set_position(position);
+    }
+
     /// Call when the computer goes to sleep or the screen locks. With the
     /// auto-pause behavior a running timer is paused. With "keep running"
     /// nothing happens: the host just keeps calling [`Engine::tick`] after
