@@ -411,7 +411,7 @@ fn toggle_starts_pauses_and_resumes() {
 // ----- skip -----
 
 #[test]
-fn skipping_a_work_phase_is_recorded_and_does_not_count_toward_the_long_break() {
+fn skipping_a_work_phase_is_recorded_as_skipped_and_advances_the_cycle() {
     let mut h = Harness::new(classic());
     for _ in 0..3 {
         h.complete(1500);
@@ -428,10 +428,32 @@ fn skipping_a_work_phase_is_recorded_and_does_not_count_toward_the_long_break() 
     let s = h.snap();
     assert_eq!(
         s.phase,
-        Some(PhaseKind::ShortBreak),
-        "3 completed work phases, not 4"
+        Some(PhaseKind::LongBreak),
+        "the skipped phase is the 4th work phase of the cycle"
     );
     assert_eq!(s.state, EngineState::Idle);
+}
+
+#[test]
+fn skipping_every_phase_still_reaches_the_long_break() {
+    let mut h = Harness::new(classic());
+    for round in 1..=4 {
+        assert_eq!(h.snap().phase, Some(PhaseKind::Work));
+        assert_eq!(h.snap().cycle.position, round);
+        h.engine.skip();
+        if round < 4 {
+            assert_eq!(h.snap().phase, Some(PhaseKind::ShortBreak));
+            h.engine.skip();
+        }
+    }
+    assert_eq!(h.snap().phase, Some(PhaseKind::LongBreak));
+    h.engine.skip();
+    let s = h.snap();
+    assert_eq!(s.phase, Some(PhaseKind::Work));
+    assert_eq!(
+        s.cycle.position, 1,
+        "the cycle starts over after the long break"
+    );
 }
 
 #[test]

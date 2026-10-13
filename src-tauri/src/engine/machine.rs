@@ -36,7 +36,9 @@ fn alert_for(kind: PhaseKind) -> AlertEvent {
 struct Pomodoro {
     kind: PhaseKind,
     timer: Timer,
-    /// Work phases completed in the current cycle.
+    /// Work phases finished in the current cycle, completed or skipped. It
+    /// is the position in the cycle, not a count of pomodoros: the history
+    /// tells those apart through the phase status.
     completed: u32,
     /// One entry per started segment of a break (a short break has one).
     /// Empty during work phases.
@@ -370,12 +372,12 @@ impl<C: Clock> Engine<C> {
     }
 
     /// Updates the cycle counter and returns the phase that follows `kind`.
-    fn advance_cycle(&mut self, kind: PhaseKind, completed: bool) -> PhaseKind {
+    /// A skipped work phase moves the cycle forward like a completed one, so
+    /// skipping repeatedly still reaches the long break.
+    fn advance_cycle(&mut self, kind: PhaseKind) -> PhaseKind {
         match kind {
             PhaseKind::Work => {
-                if completed {
-                    self.pomodoro.completed += 1;
-                }
+                self.pomodoro.completed += 1;
                 if self.pomodoro.completed >= self.settings.sessions_before_long {
                     PhaseKind::LongBreak
                 } else {
@@ -400,7 +402,7 @@ impl<C: Clock> Engine<C> {
         let record = self.build_record(PhaseStatus::Completed, unix.saturating_sub(late_ms), now);
         events.push(Event::PhaseRecorded(record));
 
-        let next = self.advance_cycle(kind, true);
+        let next = self.advance_cycle(kind);
         self.load_phase(next);
         events.push(Event::Alert {
             event: alert_for(kind),
@@ -430,7 +432,7 @@ impl<C: Clock> Engine<C> {
             let record = self.build_record(PhaseStatus::Skipped, unix, now);
             events.push(Event::PhaseRecorded(record));
         }
-        let next = self.advance_cycle(kind, false);
+        let next = self.advance_cycle(kind);
         self.load_phase(next);
         if force_start || self.settings.auto_start {
             self.pomodoro.timer.start(now, unix);

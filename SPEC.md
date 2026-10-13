@@ -103,7 +103,7 @@ Suggested validation ranges (adjust after testing): work 1 to 180 min, short bre
 
 Auto-start is a single toggle. When it is on, the next phase starts automatically when a phase ends. When it is off, the timer waits for the user to press start.
 
-Skipping a work phase does not count as a completed pomodoro and does not advance the counter toward the long break (assumption, see 20).
+Skipping a work phase does not count as a completed pomodoro (it is recorded as `skipped`), but it does advance the position in the cycle, so skipping repeatedly still reaches the long break (decided, see 20).
 
 ### 5.3 Engine state machine
 
@@ -447,7 +447,6 @@ Docusaurus in `/website`, deployed to GitHub Pages by a GitHub Actions workflow,
 
 These were not explicitly decided in the design discussion and should be confirmed or changed:
 
-1. **Skipped work phase:** it is not counted as a pomodoro and does not advance the counter toward the long break.
 2. **Long break segment change:** a light cue (the break-end sound) with no overlay or notification.
 3. **Overlay display:** covers the display that holds the widget (alternative: all displays).
 4. **Daily goal default:** 8 pomodoros.
@@ -459,6 +458,8 @@ These were not explicitly decided in the design discussion and should be confirm
 10. **Project name:** Tomatick. Availability checks are summarized in section 21.
 
 Decided: only one mode is active at a time, and switching mode resets the timer of the mode being left (section 4).
+
+Decided: a skipped work phase is not counted as a pomodoro but advances the position in the cycle, whether or not it had started (section 5.2).
 
 ## 21. Name availability check (2026-10-11)
 
