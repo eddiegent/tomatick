@@ -158,6 +158,30 @@ html.settings-window #root {
   flex: 0 0 34%;
 }
 
+/* Drag to reorder. The arrow buttons stay for the keyboard. */
+.settings .exercises.sorting {
+  cursor: grabbing;
+  user-select: none;
+}
+
+.settings .exercises li.dragging {
+  opacity: 0.5;
+}
+
+.settings .exercises li.drop-before {
+  box-shadow: 0 -2px 0 var(--accent);
+}
+
+.settings .exercises li.drop-after {
+  box-shadow: 0 2px 0 var(--accent);
+}
+
+.settings button.handle {
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+
 .settings button {
   padding: 6px 14px;
   border: 1px solid var(--line);
