@@ -801,7 +801,7 @@ fn spawn_ticker(app: AppHandle) {
             thread::sleep(TICK_INTERVAL);
             // Every few seconds, in case a screen was unplugged.
             ticks = ticks.wrapping_add(1);
-            if ticks % SCREEN_CHECK_TICKS == 0 {
+            if ticks.is_multiple_of(SCREEN_CHECK_TICKS) {
                 keep_widget_on_screen(&app);
             }
             let engine = app.state::<SharedEngine>();
