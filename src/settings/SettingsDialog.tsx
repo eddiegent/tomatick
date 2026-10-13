@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import "./settings.css";
 import { playSound } from "../alerts/sound";
@@ -64,6 +64,7 @@ const TEXT = {
     "The app goes through this list in order, one entry per short break. A long break is split into several short ones and uses the list the same way.",
   exerciseName: "Exercise",
   exerciseAmount: "Amount (optional)",
+  dragHandle: "Drag to reorder",
   moveUp: "Move up",
   moveDown: "Move down",
   remove: "Remove",
@@ -244,6 +245,10 @@ export function SettingsDialog() {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  // The exercise being dragged and the row it would land on.
+  const [drag, setDrag] = useState<{ from: number; over: number } | null>(null);
+  const dragging = useRef(false);
+  const listRef = useRef<HTMLOListElement>(null);
 
   useEffect(() => {
     document.title = TEXT.title;
@@ -256,6 +261,12 @@ export function SettingsDialog() {
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
+        // Escape cancels a drag in progress before it closes the window.
+        if (dragging.current) {
+          dragging.current = false;
+          setDrag(null);
+          return;
+        }
         closeWindow();
       }
     };
@@ -286,6 +297,30 @@ export function SettingsDialog() {
     const next = [...form.exercises];
     [next[index], next[target]] = [next[target], next[index]];
     change({ exercises: next });
+  };
+
+  const moveExerciseTo = (from: number, to: number) => {
+    if (from === to) {
+      return;
+    }
+    const next = [...form.exercises];
+    const [item] = next.splice(from, 1);
+    next.splice(to, 0, item);
+    change({ exercises: next });
+  };
+
+  /** The row under the pointer, the first or last one when it is outside. */
+  const rowAt = (clientY: number): number => {
+    const rows = listRef.current?.children;
+    if (!rows || rows.length === 0) {
+      return 0;
+    }
+    for (let i = 0; i < rows.length; i += 1) {
+      if (clientY < rows[i].getBoundingClientRect().bottom) {
+        return i;
+      }
+    }
+    return rows.length - 1;
   };
 
   const editEvent = (key: AlertEvent, patch: Partial<EventAlerts>) =>
@@ -570,9 +605,57 @@ export function SettingsDialog() {
         <section>
           <h2>{TEXT.exercises}</h2>
           <p className="help">{TEXT.exercisesHelp}</p>
-          <ol className="exercises">
+          <ol ref={listRef} className={drag ? "exercises sorting" : "exercises"}>
             {form.exercises.map((exercise, index) => (
-              <li key={index}>
+              <li
+                key={index}
+                className={
+                  drag && index === drag.from
+                    ? "dragging"
+                    : drag && index === drag.over
+                      ? drag.over > drag.from
+                        ? "drop-after"
+                        : "drop-before"
+                      : undefined
+                }
+              >
+                <button
+                  type="button"
+                  className="icon handle"
+                  title={TEXT.dragHandle}
+                  aria-label={TEXT.dragHandle}
+                  onPointerDown={(event) => {
+                    if (event.button !== 0) {
+                      return;
+                    }
+                    event.currentTarget.setPointerCapture(event.pointerId);
+                    dragging.current = true;
+                    setDrag({ from: index, over: index });
+                  }}
+                  onPointerMove={(event) => {
+                    if (!dragging.current) {
+                      return;
+                    }
+                    const over = rowAt(event.clientY);
+                    setDrag((current) =>
+                      current && current.over !== over ? { ...current, over } : current,
+                    );
+                  }}
+                  onPointerUp={(event) => {
+                    if (!dragging.current) {
+                      return;
+                    }
+                    dragging.current = false;
+                    setDrag(null);
+                    moveExerciseTo(index, rowAt(event.clientY));
+                  }}
+                  onPointerCancel={() => {
+                    dragging.current = false;
+                    setDrag(null);
+                  }}
+                >
+                  {"≡"}
+                </button>
                 <input
                   type="text"
                   placeholder={TEXT.exerciseName}
