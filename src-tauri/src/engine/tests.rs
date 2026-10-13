@@ -450,7 +450,10 @@ fn skipping_every_phase_still_reaches_the_long_break() {
     h.engine.skip();
     let s = h.snap();
     assert_eq!(s.phase, Some(PhaseKind::Work));
-    assert_eq!(s.cycle.position, 1, "the cycle starts over after the long break");
+    assert_eq!(
+        s.cycle.position, 1,
+        "the cycle starts over after the long break"
+    );
 }
 
 #[test]
