@@ -23,6 +23,9 @@ const ROTATION_KEY: &str = "rotation";
 
 /// The countdown presets of a fresh install: 5, 10, 15 and 30 minutes.
 pub const DEFAULT_COUNTDOWN_PRESETS: [u32; 4] = [5 * 60, 10 * 60, 15 * 60, 30 * 60];
+/// The daily goal of a fresh install, in pomodoros, and what it can be set to.
+pub const DEFAULT_DAILY_GOAL: u32 = 8;
+pub const DAILY_GOAL_RANGE: (u32, u32) = (1, 50);
 /// How many countdown presets can be kept.
 pub const COUNTDOWN_PRESETS_COUNT: (u32, u32) = (1, 6);
 
@@ -42,6 +45,21 @@ const MIGRATIONS: &[&str] = &[
          name     TEXT NOT NULL,
          amount   TEXT
      );",
+    // Version 2: the history of the phases (SPEC.md section 12).
+    "CREATE TABLE phases (
+         id               INTEGER PRIMARY KEY,
+         kind             TEXT NOT NULL CHECK (kind IN ('work', 'short_break', 'long_break')),
+         started_at       TEXT NOT NULL,
+         ended_at         TEXT,
+         planned_seconds  INTEGER NOT NULL,
+         actual_seconds   INTEGER NOT NULL DEFAULT 0,
+         paused_seconds   INTEGER NOT NULL DEFAULT 0,
+         extended_seconds INTEGER NOT NULL DEFAULT 0,
+         status           TEXT NOT NULL CHECK (status IN ('completed', 'skipped', 'interrupted')),
+         labels           TEXT
+     );
+     CREATE INDEX phases_started_at ON phases (started_at);
+     CREATE INDEX phases_kind_status ON phases (kind, status);",
 ];
 
 #[derive(Debug)]
@@ -49,6 +67,8 @@ pub enum StorageError {
     Database(rusqlite::Error),
     Json(serde_json::Error),
     Invalid(SettingsError),
+    /// A date that is not `YYYY-MM-DD`.
+    BadDate(String),
     /// The database was written by a newer version of the app.
     TooNew {
         found: usize,
@@ -62,6 +82,7 @@ impl fmt::Display for StorageError {
             StorageError::Database(error) => write!(f, "database error: {error}"),
             StorageError::Json(error) => write!(f, "invalid stored settings: {error}"),
             StorageError::Invalid(error) => write!(f, "{error}"),
+            StorageError::BadDate(text) => write!(f, "not a date (YYYY-MM-DD): {text}"),
             StorageError::TooNew { found, supported } => write!(
                 f,
                 "the database is at version {found} but this app supports up to {supported}"
@@ -140,6 +161,8 @@ pub struct AppSettings {
     pub countdown_secs: u32,
     /// The quick-pick durations shown when the countdown is edited, in seconds.
     pub countdown_presets: Vec<u32>,
+    /// Pomodoros to reach each day, shown in the statistics.
+    pub daily_goal: u32,
     pub alerts: AlertSettings,
 }
 
@@ -150,6 +173,7 @@ impl Default for AppSettings {
             widget_size: WidgetSize::Medium,
             countdown_secs: DEFAULT_COUNTDOWN_SECS,
             countdown_presets: DEFAULT_COUNTDOWN_PRESETS.to_vec(),
+            daily_goal: DEFAULT_DAILY_GOAL,
             alerts: AlertSettings::default(),
         }
     }
@@ -167,6 +191,7 @@ impl AppSettings {
         for preset in &self.countdown_presets {
             crate::engine::check_range("countdown_presets", *preset, COUNTDOWN_SECS_RANGE)?;
         }
+        crate::engine::check_range("daily_goal", self.daily_goal, DAILY_GOAL_RANGE)?;
         self.alerts.validate()?;
         Ok(())
     }
@@ -195,7 +220,7 @@ pub fn clean_exercises(exercises: Vec<Exercise>) -> Vec<Exercise> {
 }
 
 pub struct Store {
-    connection: Connection,
+    pub(crate) connection: Connection,
 }
 
 impl Store {
@@ -369,6 +394,18 @@ mod tests {
         store.save_settings(&settings).unwrap();
         store.save_rotation(2).unwrap();
         assert_eq!(store.load_settings().unwrap(), settings);
+    }
+
+    #[test]
+    fn the_daily_goal_defaults_to_8_and_is_validated() {
+        let mut settings = AppSettings::default();
+        assert_eq!(settings.daily_goal, 8);
+        settings.daily_goal = 0;
+        assert!(settings.validate().is_err());
+        settings.daily_goal = 51;
+        assert!(settings.validate().is_err());
+        settings.daily_goal = 50;
+        assert!(settings.validate().is_ok());
     }
 
     #[test]

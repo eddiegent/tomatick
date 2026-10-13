@@ -40,6 +40,8 @@ export interface AppSettings {
   countdown_secs: number;
   /** Quick-pick countdown durations, in seconds. One to six of them. */
   countdown_presets: number[];
+  /** Pomodoros to reach each day, shown in the statistics. */
+  daily_goal: number;
   alerts: AlertSettings;
 }
 
