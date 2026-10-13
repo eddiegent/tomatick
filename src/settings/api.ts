@@ -3,6 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import type { OverlayKind } from "../overlay/OverlayView";
 import type { AlertEvent, Exercise, TimerSettings } from "../engine/api";
+import type { ShortcutAction, Shortcuts } from "./shortcut";
 
 export type WidgetSize = "small" | "medium" | "large";
 
@@ -42,6 +43,9 @@ export interface AppSettings {
   countdown_presets: number[];
   /** Pomodoros to reach each day, shown in the statistics. */
   daily_goal: number;
+  /** Start Tomatick when the user logs in. */
+  launch_at_login: boolean;
+  shortcuts: Shortcuts;
   alerts: AlertSettings;
 }
 
@@ -59,6 +63,17 @@ export const settingsApi = {
   save: (settings: AppSettings, exercises: Exercise[]) =>
     invoke<SettingsPayload>("settings_save", { settings, exercises }),
   open: () => invoke<void>("settings_open"),
+};
+
+/** Mirrors `DesktopStatus` in src-tauri/src/lib.rs. */
+export interface DesktopStatus {
+  shortcuts: { action: ShortcutAction; accelerator: string; error: string | null }[];
+  autostart_error: string | null;
+}
+
+/** How the desktop integration went the last time it was set up. */
+export const desktopApi = {
+  status: () => invoke<DesktopStatus>("desktop_status"),
 };
 
 /** Commands for the custom alert sounds. */

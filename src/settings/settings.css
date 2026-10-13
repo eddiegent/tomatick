@@ -303,3 +303,32 @@ html.settings-window #root {
   flex: 0 0 auto;
   padding: 6px 10px;
 }
+
+.settings h3 {
+  margin: 18px 0 4px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.settings .shortcut-row {
+  display: grid;
+  grid-template-columns: 1fr auto auto auto;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 0;
+}
+
+.settings .shortcut-row .shortcut-error {
+  grid-column: 1 / -1;
+  margin: 0;
+  font-size: 13px;
+}
+
+.settings button.shortcut {
+  min-width: 150px;
+  font-variant-numeric: tabular-nums;
+}
+
+.settings button.shortcut.recording {
+  outline: 2px solid var(--accent, #d9442b);
+}

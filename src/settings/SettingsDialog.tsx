@@ -5,17 +5,27 @@ import { playSound } from "../alerts/sound";
 import type { AlertEvent, Exercise, SleepBehavior, TimerSettings } from "../engine/api";
 import { formatDuration, parseDuration } from "../engine/duration";
 import {
+  desktopApi,
   overlayApi,
   settingsApi,
   soundApi,
   type AlertSettings,
   type AppSettings,
   type BuiltinSound,
+  type DesktopStatus,
   type EventAlerts,
   type OverlayKind,
   type SoundChoice,
   type WidgetSize,
 } from "./api";
+import {
+  DEFAULT_SHORTCUTS,
+  displayShortcut,
+  isMac,
+  shortcutFromKeys,
+  type ShortcutAction,
+  type Shortcuts,
+} from "./shortcut";
 
 // English only for now. The text moves to the translation files in
 // milestone 10.
@@ -35,6 +45,22 @@ const TEXT = {
   small: "Small",
   medium: "Medium",
   large: "Large",
+  system: "System",
+  launch: "Launch Tomatick when I log in",
+  shortcuts: "Global shortcuts",
+  shortcutsHelp:
+    "Work even when another application has focus. Click a shortcut, then press the new keys. Escape cancels.",
+  shortcutStartPause: "Start or pause",
+  shortcutSkip: "Skip to the next phase",
+  shortcutToggle: "Show or hide the widget",
+  shortcutNone: "Not set",
+  shortcutPress: "Press the keys",
+  shortcutNeedsModifier: "Hold Ctrl, Alt, Shift or Cmd together with the key.",
+  shortcutClear: "Clear",
+  shortcutDefault: "Default",
+  shortcutFailed: "Could not register this shortcut: ",
+  launchFailed: "Could not change launch at login: ",
+  desktopProblems: "Saved, but some desktop settings did not apply. See the System section.",
   countdown: "Countdown timer",
   countdownStart: "Starting value",
   countdownHelp: "Minutes, or m:ss (for example 10 or 1:30).",
@@ -116,6 +142,8 @@ interface Form {
   longBreak: string;
   sessions: string;
   goal: string;
+  launch: boolean;
+  shortcuts: Shortcuts;
   autoStart: boolean;
   sleep: SleepBehavior;
   size: WidgetSize;
@@ -130,6 +158,8 @@ function toForm(settings: AppSettings, exercises: Exercise[]): Form {
     ...timerToForm(settings.timer),
     size: settings.widget_size,
     goal: String(settings.daily_goal),
+    launch: settings.launch_at_login,
+    shortcuts: settings.shortcuts,
     countdown: formatDuration(settings.countdown_secs),
     presets: settings.countdown_presets.map(formatDuration).join(", "),
     alerts: settings.alerts,
@@ -228,9 +258,89 @@ function fromForm(form: Form): { settings: AppSettings } | { error: string } {
       countdown_secs: countdown,
       countdown_presets: presets,
       daily_goal: goal,
+      launch_at_login: form.launch,
+      shortcuts: form.shortcuts,
       alerts: form.alerts,
     },
   };
+}
+
+const SHORTCUT_LABELS: { key: ShortcutAction; label: string }[] = [
+  { key: "start_pause", label: TEXT.shortcutStartPause },
+  { key: "skip", label: TEXT.shortcutSkip },
+  { key: "toggle_widget", label: TEXT.shortcutToggle },
+];
+
+/** A shortcut that is changed by pressing the new keys. */
+function ShortcutField({
+  label,
+  value,
+  error,
+  onChange,
+  onDefault,
+}: {
+  label: string;
+  value: string;
+  error: string | null;
+  onChange: (value: string) => void;
+  onDefault: () => void;
+}) {
+  const [recording, setRecording] = useState(false);
+  const [hint, setHint] = useState<string | null>(null);
+  const mac = isMac();
+
+  const onKeyDown = (event: React.KeyboardEvent<HTMLButtonElement>) => {
+    if (!recording) {
+      return;
+    }
+    // Keep the press from reaching the window, where Escape closes it.
+    event.preventDefault();
+    event.nativeEvent.stopPropagation();
+    if (event.key === "Escape") {
+      setRecording(false);
+      setHint(null);
+      return;
+    }
+    const result = shortcutFromKeys(event.nativeEvent, mac);
+    if (result === null) {
+      return;
+    }
+    if (result === "needs-modifier") {
+      setHint(TEXT.shortcutNeedsModifier);
+      return;
+    }
+    onChange(result);
+    setRecording(false);
+    setHint(null);
+  };
+
+  return (
+    <div className="shortcut-row">
+      <span className="shortcut-label">{label}</span>
+      <button
+        type="button"
+        className={recording ? "shortcut recording" : "shortcut"}
+        aria-label={`${label}: ${value === "" ? TEXT.shortcutNone : displayShortcut(value, mac)}`}
+        onClick={() => setRecording(true)}
+        onBlur={() => {
+          setRecording(false);
+          setHint(null);
+        }}
+        onKeyDown={onKeyDown}
+      >
+        {recording ? TEXT.shortcutPress : value === "" ? TEXT.shortcutNone : displayShortcut(value, mac)}
+      </button>
+      <button type="button" className="secondary" onClick={onDefault}>
+        {TEXT.shortcutDefault}
+      </button>
+      <button type="button" className="secondary" onClick={() => onChange("")}>
+        {TEXT.shortcutClear}
+      </button>
+      {(hint || error) && (
+        <p className="error shortcut-error">{hint ?? `${TEXT.shortcutFailed}${error}`}</p>
+      )}
+    </div>
+  );
 }
 
 function Field({ label, children }: { label: string; children: ReactNode }) {
@@ -254,6 +364,7 @@ export function SettingsDialog() {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [desktop, setDesktop] = useState<DesktopStatus | null>(null);
   // The exercise being dragged and the row it would land on.
   const [drag, setDrag] = useState<{ from: number; over: number } | null>(null);
   const dragging = useRef(false);
@@ -265,6 +376,10 @@ export function SettingsDialog() {
       .get()
       .then(({ settings, exercises }) => setForm(toForm(settings, exercises)))
       .catch((e) => setError(String(e)));
+    desktopApi
+      .status()
+      .then(setDesktop)
+      .catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -387,6 +502,18 @@ export function SettingsDialog() {
     setSaving(true);
     try {
       await settingsApi.save(result.settings, form.exercises);
+      // A shortcut another application holds, or a refused login item, does
+      // not undo the save. The window stays open so the user can see why.
+      const status = await desktopApi.status().catch(() => null);
+      setDesktop(status);
+      const failed =
+        status !== null &&
+        (status.autostart_error !== null || status.shortcuts.some((s) => s.error !== null));
+      if (failed) {
+        setError(TEXT.desktopProblems);
+        setSaving(false);
+        return;
+      }
       closeWindow();
     } catch (e) {
       setError(String(e));
@@ -480,6 +607,35 @@ export function SettingsDialog() {
               </label>
             ))}
           </div>
+        </section>
+
+        <section>
+          <h2>{TEXT.system}</h2>
+          <label className="check">
+            <input
+              type="checkbox"
+              checked={form.launch}
+              onChange={(e) => change({ launch: e.target.checked })}
+            />
+            {TEXT.launch}
+          </label>
+          {desktop?.autostart_error && (
+            <p className="error">{`${TEXT.launchFailed}${desktop.autostart_error}`}</p>
+          )}
+          <h3>{TEXT.shortcuts}</h3>
+          <p className="help">{TEXT.shortcutsHelp}</p>
+          {SHORTCUT_LABELS.map(({ key, label }) => (
+            <ShortcutField
+              key={key}
+              label={label}
+              value={form.shortcuts[key]}
+              error={desktop?.shortcuts.find((s) => s.action === key)?.error ?? null}
+              onChange={(value) => change({ shortcuts: { ...form.shortcuts, [key]: value } })}
+              onDefault={() =>
+                change({ shortcuts: { ...form.shortcuts, [key]: DEFAULT_SHORTCUTS[key] } })
+              }
+            />
+          ))}
         </section>
 
         <section>

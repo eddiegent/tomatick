@@ -2,7 +2,10 @@ pub mod alerts;
 pub mod engine;
 pub mod history;
 pub mod overlay;
+pub mod power;
+pub mod shortcuts;
 pub mod storage;
+pub mod tray;
 
 use std::sync::{Mutex, MutexGuard};
 use std::thread;
@@ -14,14 +17,19 @@ use tauri::{
     AppHandle, Emitter, Manager, PhysicalPosition, PhysicalSize, State, WebviewUrl,
     WebviewWindowBuilder,
 };
+use tauri_plugin_autostart::{MacosLauncher, ManagerExt as _};
 use tauri_plugin_dialog::DialogExt;
+use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutState};
 use tauri_plugin_notification::NotificationExt;
 
 use alerts::{SOUND_EXTENSIONS, SOUNDS_DIR};
 use engine::{Engine, EngineState, Event, Exercise, Mode, Snapshot, SystemClock, TimerSettings};
 use history::{LOCAL_TIME, OpenPhase, Period, Stats, StatsQuery};
 use overlay::{OVERLAY_WINDOW, OverlayKind, overlay_url};
+use power::{GapDetector, PowerEvent, PowerListener};
+use shortcuts::{ShortcutAction, ShortcutSettings};
 use storage::{AppSettings, DEFAULT_DAILY_GOAL, Store, clean_exercises};
+use tray::Action;
 
 /// How often the engine is ticked.
 const TICK_INTERVAL: Duration = Duration::from_millis(250);
@@ -91,6 +99,7 @@ fn publish(app: &AppHandle, events: &[Event], snapshot: &Snapshot) {
         record_history(app, event, snapshot);
     }
     let _ = app.emit(STATE_EVENT, snapshot);
+    tray::refresh(app, snapshot, widget_visible(app));
 }
 
 fn unix_now_ms() -> u64 {
@@ -171,6 +180,161 @@ fn run_alert(app: &AppHandle, event: engine::AlertEvent, label: Option<&str>) {
     {
         open_overlay_later(app, kind, false);
     }
+}
+
+/// Whether the widget window is on screen.
+fn widget_visible(app: &AppHandle) -> bool {
+    app.get_webview_window(WIDGET_WINDOW)
+        .and_then(|window| window.is_visible().ok())
+        .unwrap_or(true)
+}
+
+fn toggle_widget(app: &AppHandle) {
+    if let Some(window) = app.get_webview_window(WIDGET_WINDOW) {
+        if window.is_visible().unwrap_or(true) {
+            let _ = window.hide();
+        } else {
+            bring_widget_to_front(app);
+        }
+    }
+    let snapshot = lock(&app.state::<SharedEngine>()).snapshot();
+    tray::refresh(app, &snapshot, widget_visible(app));
+}
+
+/// Carries out something asked for from the tray menu or a global shortcut.
+pub(crate) fn run_action(app: &AppHandle, action: Action) {
+    let engine = app.state::<SharedEngine>();
+    match action {
+        Action::StartPause => with_engine(app, &engine, |e| e.toggle()),
+        Action::Skip => with_engine(app, &engine, |e| e.skip()),
+        Action::SetMode(mode) => with_engine(app, &engine, |e| e.set_mode(mode)),
+        Action::ToggleWidget => toggle_widget(app),
+        // Windows are built from a thread of their own: building one from
+        // the thread that handles a menu click can deadlock on Windows.
+        Action::OpenStats => {
+            let app = app.clone();
+            thread::spawn(move || {
+                if let Err(error) = open_stats_window(&app) {
+                    eprintln!("Tomatick: cannot open the statistics: {error}");
+                }
+            });
+        }
+        Action::OpenSettings => {
+            let app = app.clone();
+            thread::spawn(move || {
+                if let Err(error) = open_settings_window(&app) {
+                    eprintln!("Tomatick: cannot open the settings: {error}");
+                }
+            });
+        }
+        Action::Quit => app.exit(0),
+    }
+}
+
+fn action_for_shortcut(action: ShortcutAction) -> Action {
+    match action {
+        ShortcutAction::StartPause => Action::StartPause,
+        ShortcutAction::Skip => Action::Skip,
+        ShortcutAction::ToggleWidget => Action::ToggleWidget,
+    }
+}
+
+/// How one global shortcut ended up: registered, or why not.
+#[derive(Clone, Debug, Serialize)]
+struct ShortcutStatus {
+    action: ShortcutAction,
+    accelerator: String,
+    /// `None` when registered, or when the shortcut is not bound.
+    error: Option<String>,
+}
+
+/// What the settings dialog shows about the desktop integration.
+#[derive(Clone, Debug, Default, Serialize)]
+struct DesktopStatus {
+    shortcuts: Vec<ShortcutStatus>,
+    /// Why launch at login could not be switched, if it could not.
+    autostart_error: Option<String>,
+}
+
+/// Which registered shortcut does what, and how the last registration went.
+#[derive(Default)]
+struct Desktop {
+    bindings: Mutex<Vec<(u32, Action)>>,
+    status: Mutex<DesktopStatus>,
+}
+
+fn lock_desktop<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
+    mutex
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+}
+
+/// Registers the global shortcuts, replacing the previous ones. A shortcut
+/// that another application already holds, or that the system refuses (for
+/// example under Wayland), is reported in the status and does not stop the
+/// others.
+fn apply_shortcuts(app: &AppHandle, settings: &ShortcutSettings) {
+    let manager = app.global_shortcut();
+    let _ = manager.unregister_all();
+
+    let mut bindings = Vec::new();
+    let mut statuses = Vec::new();
+    for (action, text) in settings.bindings() {
+        let mut error = None;
+        if !text.is_empty() {
+            let registered = text
+                .parse::<Shortcut>()
+                .map_err(|e| e.to_string())
+                .and_then(|shortcut| {
+                    manager
+                        .register(shortcut)
+                        .map(|()| shortcut)
+                        .map_err(|e| e.to_string())
+                });
+            match registered {
+                Ok(shortcut) => bindings.push((shortcut.id(), action_for_shortcut(action))),
+                Err(message) => {
+                    eprintln!("Tomatick: cannot register {text}: {message}");
+                    error = Some(message);
+                }
+            }
+        }
+        statuses.push(ShortcutStatus {
+            action,
+            accelerator: text.to_string(),
+            error,
+        });
+    }
+
+    let desktop = app.state::<Desktop>();
+    *lock_desktop(&desktop.bindings) = bindings;
+    lock_desktop(&desktop.status).shortcuts = statuses;
+}
+
+/// Switches launch at login to match the setting. Nothing is touched when it
+/// already matches, so the default (off) leaves the system alone.
+fn apply_autostart(app: &AppHandle, wanted: bool) {
+    let manager = app.autolaunch();
+    let error = match manager.is_enabled() {
+        Ok(current) if current == wanted => None,
+        _ => {
+            let result = if wanted {
+                manager.enable()
+            } else {
+                manager.disable()
+            };
+            result.err().map(|e| e.to_string())
+        }
+    };
+    if let Some(message) = &error {
+        eprintln!("Tomatick: cannot change launch at login: {message}");
+    }
+    lock_desktop(&app.state::<Desktop>().status).autostart_error = error;
+}
+
+#[tauri::command]
+fn desktop_status(desktop: State<'_, Desktop>) -> DesktopStatus {
+    lock_desktop(&desktop.status).clone()
 }
 
 fn bring_widget_to_front(app: &AppHandle) {
@@ -452,10 +616,11 @@ fn settings_save(
     app: AppHandle,
     engine: State<'_, SharedEngine>,
     store: State<'_, SharedStore>,
-    settings: AppSettings,
+    mut settings: AppSettings,
     exercises: Vec<Exercise>,
 ) -> Result<SettingsPayload, String> {
     settings.validate().map_err(|e| e.to_string())?;
+    settings.shortcuts = settings.shortcuts.normalized().map_err(|e| e.to_string())?;
 
     let (previous, saved_exercises) = {
         let mut store = lock_store(&store);
@@ -477,6 +642,9 @@ fn settings_save(
         }
         Ok::<(), engine::EngineError>(())
     })?;
+
+    apply_shortcuts(&app, &settings.shortcuts);
+    apply_autostart(&app, settings.launch_at_login);
 
     let payload = SettingsPayload {
         settings,
@@ -512,11 +680,15 @@ fn stats_get(
 
 #[tauri::command]
 async fn stats_open(app: AppHandle) -> Result<(), String> {
+    open_stats_window(&app)
+}
+
+fn open_stats_window(app: &AppHandle) -> Result<(), String> {
     if let Some(window) = app.get_webview_window(STATS_WINDOW) {
         let _ = window.unminimize();
         return window.set_focus().map_err(|e| e.to_string());
     }
-    WebviewWindowBuilder::new(&app, STATS_WINDOW, WebviewUrl::App("index.html".into()))
+    WebviewWindowBuilder::new(app, STATS_WINDOW, WebviewUrl::App("index.html".into()))
         .title("Tomatick statistics")
         .inner_size(600.0, 760.0)
         .min_inner_size(460.0, 520.0)
@@ -529,11 +701,15 @@ async fn stats_open(app: AppHandle) -> Result<(), String> {
 
 #[tauri::command]
 async fn settings_open(app: AppHandle) -> Result<(), String> {
+    open_settings_window(&app)
+}
+
+fn open_settings_window(app: &AppHandle) -> Result<(), String> {
     if let Some(window) = app.get_webview_window(SETTINGS_WINDOW) {
         let _ = window.unminimize();
         return window.set_focus().map_err(|e| e.to_string());
     }
-    WebviewWindowBuilder::new(&app, SETTINGS_WINDOW, WebviewUrl::App("index.html".into()))
+    WebviewWindowBuilder::new(app, SETTINGS_WINDOW, WebviewUrl::App("index.html".into()))
         .title("Tomatick settings")
         .inner_size(540.0, 700.0)
         .min_inner_size(440.0, 480.0)
@@ -547,20 +723,34 @@ async fn settings_open(app: AppHandle) -> Result<(), String> {
 /// Ticks the engine on a background thread and publishes what happens.
 fn spawn_ticker(app: AppHandle) {
     thread::spawn(move || {
+        let mut power: Box<dyn PowerListener> = Box::new(GapDetector::default());
         loop {
             thread::sleep(TICK_INTERVAL);
             let engine = app.state::<SharedEngine>();
-            let (events, snapshot, rotation) = {
+            let (events, snapshot, rotation, suspended) = {
                 let mut engine = lock(&engine);
+                // A sleep is noticed on wake, before the tick, so a phase
+                // that "ended" during the sleep is paused instead.
+                let mut suspended = false;
+                for event in power.poll(engine.now_ms()) {
+                    let PowerEvent::Suspended { since_ms } = event;
+                    engine.on_system_suspend_at(since_ms);
+                    suspended = true;
+                }
                 let events = engine.tick();
-                (events, engine.snapshot(), engine.rotation_position())
+                (
+                    events,
+                    engine.snapshot(),
+                    engine.rotation_position(),
+                    suspended,
+                )
             };
             // The rotation only moves when something happens, so the
             // database is left alone on a quiet tick.
             if !events.is_empty() {
                 remember_rotation(&app, rotation);
             }
-            if !events.is_empty() || snapshot.state == EngineState::Running {
+            if suspended || !events.is_empty() || snapshot.state == EngineState::Running {
                 publish(&app, &events, &snapshot);
             }
         }
@@ -611,6 +801,30 @@ pub fn run() {
                 .with_state_flags(tauri_plugin_window_state::StateFlags::POSITION)
                 .build(),
         )
+        .plugin(tauri_plugin_autostart::init(
+            MacosLauncher::LaunchAgent,
+            None,
+        ))
+        .plugin(
+            tauri_plugin_global_shortcut::Builder::new()
+                .with_handler(|app, shortcut, event| {
+                    if event.state != ShortcutState::Pressed {
+                        return;
+                    }
+                    let action = {
+                        let desktop = app.state::<Desktop>();
+                        let bindings = lock_desktop(&desktop.bindings);
+                        bindings
+                            .iter()
+                            .find(|(id, _)| *id == shortcut.id())
+                            .map(|(_, action)| *action)
+                    };
+                    if let Some(action) = action {
+                        run_action(app, action);
+                    }
+                })
+                .build(),
+        )
         .setup(|app| {
             let store = open_store(app.handle());
             // A phase that was running when the app last stopped without
@@ -619,8 +833,14 @@ pub fn run() {
                 eprintln!("Tomatick: cannot recover the last phase: {error}");
             }
             let engine = build_engine(&store);
+            let settings = store.load_settings().unwrap_or_default();
             app.manage(Mutex::new(engine));
             app.manage(Mutex::new(store));
+            app.manage(Desktop::default());
+            apply_shortcuts(app.handle(), &settings.shortcuts);
+            if let Err(error) = tray::build(app.handle()) {
+                eprintln!("Tomatick: no tray icon: {error}");
+            }
             // Some systems ask the user once; elsewhere this is always granted.
             let _ = app.notification().request_permission();
             spawn_ticker(app.handle().clone());
@@ -648,6 +868,7 @@ pub fn run() {
             settings_open,
             stats_get,
             stats_open,
+            desktop_status,
             overlay_preview,
         ])
         .build(tauri::generate_context!())

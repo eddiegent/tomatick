@@ -15,6 +15,7 @@ use crate::alerts::{AlertError, AlertSettings};
 use crate::engine::{
     COUNTDOWN_SECS_RANGE, DEFAULT_COUNTDOWN_SECS, EngineError, Exercise, TimerSettings,
 };
+use crate::shortcuts::{ShortcutError, ShortcutSettings};
 
 /// The key under which [`AppSettings`] is stored in the `settings` table.
 const SETTINGS_KEY: &str = "app";
@@ -116,6 +117,7 @@ impl From<SettingsError> for StorageError {
 pub enum SettingsError {
     Timer(EngineError),
     Alerts(AlertError),
+    Shortcuts(ShortcutError),
 }
 
 impl fmt::Display for SettingsError {
@@ -123,6 +125,7 @@ impl fmt::Display for SettingsError {
         match self {
             SettingsError::Timer(error) => write!(f, "{error}"),
             SettingsError::Alerts(error) => write!(f, "{error}"),
+            SettingsError::Shortcuts(error) => write!(f, "{error}"),
         }
     }
 }
@@ -132,6 +135,12 @@ impl std::error::Error for SettingsError {}
 impl From<EngineError> for SettingsError {
     fn from(error: EngineError) -> Self {
         SettingsError::Timer(error)
+    }
+}
+
+impl From<ShortcutError> for SettingsError {
+    fn from(error: ShortcutError) -> Self {
+        SettingsError::Shortcuts(error)
     }
 }
 
@@ -163,6 +172,9 @@ pub struct AppSettings {
     pub countdown_presets: Vec<u32>,
     /// Pomodoros to reach each day, shown in the statistics.
     pub daily_goal: u32,
+    /// Start Tomatick when the user logs in.
+    pub launch_at_login: bool,
+    pub shortcuts: ShortcutSettings,
     pub alerts: AlertSettings,
 }
 
@@ -174,6 +186,8 @@ impl Default for AppSettings {
             countdown_secs: DEFAULT_COUNTDOWN_SECS,
             countdown_presets: DEFAULT_COUNTDOWN_PRESETS.to_vec(),
             daily_goal: DEFAULT_DAILY_GOAL,
+            launch_at_login: false,
+            shortcuts: ShortcutSettings::default(),
             alerts: AlertSettings::default(),
         }
     }
@@ -192,6 +206,7 @@ impl AppSettings {
             crate::engine::check_range("countdown_presets", *preset, COUNTDOWN_SECS_RANGE)?;
         }
         crate::engine::check_range("daily_goal", self.daily_goal, DAILY_GOAL_RANGE)?;
+        self.shortcuts.validate()?;
         self.alerts.validate()?;
         Ok(())
     }
@@ -406,6 +421,34 @@ mod tests {
         assert!(settings.validate().is_err());
         settings.daily_goal = 50;
         assert!(settings.validate().is_ok());
+    }
+
+    #[test]
+    fn desktop_settings_default_and_old_databases_still_load() {
+        let settings = AppSettings::default();
+        assert!(!settings.launch_at_login);
+        assert_eq!(settings.shortcuts.start_pause, "CommandOrControl+Alt+P");
+
+        // Settings stored before these fields existed fall back to defaults.
+        let store = Store::open_in_memory().unwrap();
+        store
+            .connection
+            .execute(
+                "INSERT INTO settings (key, value) VALUES ('app', '{\"daily_goal\": 3}')",
+                [],
+            )
+            .unwrap();
+        let loaded = store.load_settings().unwrap();
+        assert_eq!(loaded.daily_goal, 3);
+        assert_eq!(loaded.shortcuts, ShortcutSettings::default());
+        assert!(!loaded.launch_at_login);
+    }
+
+    #[test]
+    fn conflicting_shortcuts_are_refused_by_validation() {
+        let mut settings = AppSettings::default();
+        settings.shortcuts.skip = settings.shortcuts.start_pause.clone();
+        assert!(settings.validate().is_err());
     }
 
     #[test]
