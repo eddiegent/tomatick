@@ -1,5 +1,6 @@
 pub mod alerts;
 pub mod engine;
+pub mod overlay;
 pub mod storage;
 
 use std::sync::{Mutex, MutexGuard};
@@ -8,12 +9,16 @@ use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
 use tauri::ipc::Response;
-use tauri::{AppHandle, Emitter, Manager, State, WebviewUrl, WebviewWindowBuilder};
+use tauri::{
+    AppHandle, Emitter, Manager, PhysicalPosition, PhysicalSize, State, WebviewUrl,
+    WebviewWindowBuilder,
+};
 use tauri_plugin_dialog::DialogExt;
 use tauri_plugin_notification::NotificationExt;
 
 use alerts::{SOUND_EXTENSIONS, SOUNDS_DIR};
 use engine::{Engine, EngineState, Event, Exercise, Mode, Snapshot, SystemClock, TimerSettings};
+use overlay::{OVERLAY_WINDOW, OverlayKind, overlay_url};
 use storage::{AppSettings, Store, clean_exercises};
 
 /// How often the engine is ticked.
@@ -33,6 +38,17 @@ const SETTINGS_WINDOW: &str = "settings";
 
 /// Label of the widget window.
 const WIDGET_WINDOW: &str = "main";
+
+/// Sent to an overlay that is already open, to show another kind.
+/// Payload: [`OverlayRequest`].
+const OVERLAY_EVENT: &str = "overlay:open";
+
+/// What the overlay page is asked to show.
+#[derive(Clone, Copy, Debug, Serialize)]
+struct OverlayRequest {
+    kind: OverlayKind,
+    preview: bool,
+}
 
 type SharedEngine = Mutex<Engine<SystemClock>>;
 type SharedStore = Mutex<Store>;
@@ -86,6 +102,11 @@ fn run_alert(app: &AppHandle, event: engine::AlertEvent, label: Option<&str>) {
     if alerts.bring_to_front {
         bring_widget_to_front(app);
     }
+    if alerts.overlay
+        && let Some(kind) = OverlayKind::for_event(event)
+    {
+        open_overlay_later(app, kind, false);
+    }
 }
 
 fn bring_widget_to_front(app: &AppHandle) {
@@ -94,6 +115,78 @@ fn bring_widget_to_front(app: &AppHandle) {
         let _ = window.unminimize();
         let _ = window.set_focus();
     }
+}
+
+/// Opens the overlay from a thread of its own. Building a window from the
+/// thread that handles a command can deadlock on Windows.
+fn open_overlay_later(app: &AppHandle, kind: OverlayKind, preview: bool) {
+    let app = app.clone();
+    thread::spawn(move || {
+        if let Err(error) = open_overlay(&app, kind, preview) {
+            eprintln!("Tomatick: cannot open the overlay: {error}");
+        }
+    });
+}
+
+/// Opens the full-screen overlay on the display that holds the widget, or
+/// brings the open one forward and tells it what to show.
+fn open_overlay(app: &AppHandle, kind: OverlayKind, preview: bool) -> Result<(), String> {
+    if let Some(window) = app.get_webview_window(OVERLAY_WINDOW) {
+        let _ = app.emit_to(
+            OVERLAY_WINDOW,
+            OVERLAY_EVENT,
+            OverlayRequest { kind, preview },
+        );
+        let _ = window.show();
+        return window.set_focus().map_err(|e| e.to_string());
+    }
+
+    // The monitor of the widget, else the primary one, else a default size.
+    let monitor = app
+        .get_webview_window(WIDGET_WINDOW)
+        .and_then(|widget| widget.current_monitor().ok().flatten())
+        .or_else(|| app.primary_monitor().ok().flatten());
+
+    // Built hidden and placed in physical pixels, so a monitor with another
+    // scale factor than the primary one still gets covered completely.
+    let window = WebviewWindowBuilder::new(
+        app,
+        OVERLAY_WINDOW,
+        WebviewUrl::App(overlay_url(kind, preview).into()),
+    )
+    .title("Tomatick")
+    .decorations(false)
+    .transparent(true)
+    .shadow(false)
+    .resizable(false)
+    .always_on_top(true)
+    .skip_taskbar(true)
+    .visible(false)
+    .focused(true)
+    .build()
+    .map_err(|e| e.to_string())?;
+
+    match monitor {
+        Some(monitor) => {
+            let position = monitor.position();
+            let size = monitor.size();
+            let _ = window.set_position(PhysicalPosition::new(position.x, position.y));
+            let _ = window.set_size(PhysicalSize::new(size.width, size.height));
+        }
+        None => {
+            let _ = window.maximize();
+        }
+    }
+    window.show().map_err(|e| e.to_string())?;
+    let _ = window.set_focus();
+    Ok(())
+}
+
+/// Opens the overlay with sample content, for the preview in the settings.
+/// The timer is not touched.
+#[tauri::command]
+async fn overlay_preview(app: AppHandle, kind: OverlayKind) -> Result<(), String> {
+    open_overlay(&app, kind, true)
 }
 
 /// Runs a command on the engine, then publishes its events and the new state.
@@ -427,6 +520,7 @@ pub fn run() {
             sound_add,
             sound_data,
             settings_open,
+            overlay_preview,
         ])
         .run(tauri::generate_context!())
         .expect("error while running Tomatick");

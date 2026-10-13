@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+import type { OverlayKind } from "../overlay/OverlayView";
 import type { AlertEvent, Exercise, TimerSettings } from "../engine/api";
 
 export type WidgetSize = "small" | "medium" | "large";
@@ -63,6 +64,14 @@ export const soundApi = {
    * Resolves to the stored file name, or `null` if the dialog was cancelled.
    */
   add: () => invoke<string | null>("sound_add"),
+};
+
+export type { OverlayKind };
+
+/** Commands for the full-screen overlay. */
+export const overlayApi = {
+  /** Opens the overlay with sample content. The timer is not touched. */
+  preview: (kind: OverlayKind) => invoke<void>("overlay_preview", { kind }),
 };
 
 /** The stored settings, kept up to date when they change anywhere. */

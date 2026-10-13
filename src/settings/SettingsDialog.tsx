@@ -5,12 +5,14 @@ import { playSound } from "../alerts/sound";
 import type { AlertEvent, Exercise, SleepBehavior, TimerSettings } from "../engine/api";
 import { formatDuration, parseDuration } from "../engine/duration";
 import {
+  overlayApi,
   settingsApi,
   soundApi,
   type AlertSettings,
   type AppSettings,
   type BuiltinSound,
   type EventAlerts,
+  type OverlayKind,
   type SoundChoice,
   type WidgetSize,
 } from "./api";
@@ -42,6 +44,9 @@ const TEXT = {
   mute: "Mute all alert sounds",
   notification: "System notification",
   bringToFront: "Bring the widget to the front",
+  overlay: "Full-screen overlay",
+  previewOverlay: "Preview overlay",
+  previewOverlayHint: "Show the overlay with sample content. The timer is not touched.",
   sound: "Sound",
   builtinSounds: "Built-in",
   yourSounds: "Your files",
@@ -67,11 +72,11 @@ const TEXT = {
   saving: "Saving",
 };
 
-const ALERT_EVENTS: { key: AlertEvent; label: string }[] = [
-  { key: "work_end", label: "Work ends (a break starts)" },
+const ALERT_EVENTS: { key: AlertEvent; label: string; overlay?: OverlayKind }[] = [
+  { key: "work_end", label: "Work ends (a break starts)", overlay: "break" },
   { key: "short_break_end", label: "Short break ends" },
   { key: "long_break_end", label: "Long break ends" },
-  { key: "countdown_end", label: "Countdown ends" },
+  { key: "countdown_end", label: "Countdown ends", overlay: "countdown" },
 ];
 
 const BUILTIN_SOUND_LABELS: Record<BuiltinSound, string> = {
@@ -425,7 +430,7 @@ export function SettingsDialog() {
               onChange={(e) => editAlerts({ volume: Number(e.target.value) })}
             />
           </label>
-          {ALERT_EVENTS.map(({ key, label }) => {
+          {ALERT_EVENTS.map(({ key, label, overlay }) => {
             const alerts = form.alerts[key];
             return (
               <fieldset className="alert-event" key={key}>
@@ -446,6 +451,25 @@ export function SettingsDialog() {
                   />
                   <span>{TEXT.bringToFront}</span>
                 </label>
+                {overlay && (
+                  <div className="overlay-row">
+                    <label className="check">
+                      <input
+                        type="checkbox"
+                        checked={alerts.overlay}
+                        onChange={(e) => editEvent(key, { overlay: e.target.checked })}
+                      />
+                      <span>{TEXT.overlay}</span>
+                    </label>
+                    <button
+                      type="button"
+                      title={TEXT.previewOverlayHint}
+                      onClick={() => overlayApi.preview(overlay).catch(() => undefined)}
+                    >
+                      {TEXT.previewOverlay}
+                    </button>
+                  </div>
+                )}
                 <div className="sound-row">
                   <label className="check">
                     <input

@@ -241,6 +241,23 @@ html.settings-window #root {
   margin: 6px 0;
 }
 
+.settings .overlay-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.settings .overlay-row .check {
+  flex: 0 0 auto;
+  margin: 6px 0;
+}
+
+.settings .overlay-row button {
+  flex: 0 0 auto;
+  padding: 6px 10px;
+}
+
 .settings .sound-row {
   display: flex;
   align-items: center;

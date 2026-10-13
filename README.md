@@ -2,7 +2,7 @@
 
 A free, open source Pomodoro timer for Windows, macOS and Linux, built around a small always-on-top tomato widget.
 
-> **Status: early development.** There is no released version yet. The design is written down in [SPEC.md](SPEC.md), and the project skeleton (Tauri, React, CI), the timer engine, the tomato widget, the settings dialog, and alert notifications and sounds are in place. The full-screen overlay and history are next.
+> **Status: early development.** There is no released version yet. The design is written down in [SPEC.md](SPEC.md), and the project skeleton (Tauri, React, CI), the timer engine, the tomato widget, the settings dialog, and the alerts (notifications, sounds and the full-screen overlay) are in place. History is next.
 
 ## What it is
 
