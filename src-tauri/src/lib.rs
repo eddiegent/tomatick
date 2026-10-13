@@ -3,6 +3,7 @@ pub mod engine;
 pub mod history;
 pub mod i18n;
 pub mod overlay;
+pub mod placement;
 pub mod power;
 pub mod shortcuts;
 pub mod storage;
@@ -31,6 +32,9 @@ use power::{GapDetector, PowerEvent, PowerListener};
 use shortcuts::{ShortcutAction, ShortcutSettings};
 use storage::{AppSettings, DEFAULT_DAILY_GOAL, Store, clean_exercises};
 use tray::Action;
+
+/// The widget is checked against the screens every this many ticks (5 s).
+const SCREEN_CHECK_TICKS: u32 = 20;
 
 /// How often the engine is ticked.
 const TICK_INTERVAL: Duration = Duration::from_millis(250);
@@ -363,9 +367,45 @@ fn desktop_status(desktop: State<'_, Desktop>) -> DesktopStatus {
     lock_desktop(&desktop.status).clone()
 }
 
+/// Moves the widget onto a screen if it is not on one, for example after a
+/// monitor was unplugged. Does nothing while it is hidden or already visible
+/// on a screen.
+fn keep_widget_on_screen(app: &AppHandle) {
+    let Some(window) = app.get_webview_window(WIDGET_WINDOW) else {
+        return;
+    };
+    if !window.is_visible().unwrap_or(false) {
+        return;
+    }
+    let (Ok(position), Ok(size), Ok(monitors)) = (
+        window.outer_position(),
+        window.outer_size(),
+        window.available_monitors(),
+    ) else {
+        return;
+    };
+    let screens: Vec<placement::Rect> = monitors
+        .iter()
+        .map(|monitor| {
+            let area = monitor.work_area();
+            placement::Rect::new(
+                area.position.x,
+                area.position.y,
+                area.size.width,
+                area.size.height,
+            )
+        })
+        .collect();
+    let widget = placement::Rect::new(position.x, position.y, size.width, size.height);
+    if let Some((x, y)) = placement::reposition(widget, &screens) {
+        let _ = window.set_position(PhysicalPosition::new(x, y));
+    }
+}
+
 fn bring_widget_to_front(app: &AppHandle) {
     if let Some(window) = app.get_webview_window(WIDGET_WINDOW) {
         let _ = window.show();
+        keep_widget_on_screen(app);
         let _ = window.unminimize();
         let _ = window.set_focus();
     }
@@ -756,8 +796,14 @@ fn open_settings_window(app: &AppHandle) -> Result<(), String> {
 fn spawn_ticker(app: AppHandle) {
     thread::spawn(move || {
         let mut power: Box<dyn PowerListener> = Box::new(GapDetector::default());
+        let mut ticks: u32 = 0;
         loop {
             thread::sleep(TICK_INTERVAL);
+            // Every few seconds, in case a screen was unplugged.
+            ticks = ticks.wrapping_add(1);
+            if ticks % SCREEN_CHECK_TICKS == 0 {
+                keep_widget_on_screen(&app);
+            }
             let engine = app.state::<SharedEngine>();
             let (events, snapshot, rotation, suspended) = {
                 let mut engine = lock(&engine);
