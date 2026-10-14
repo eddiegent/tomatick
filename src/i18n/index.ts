@@ -23,6 +23,19 @@ LANGUAGES.sort((a, b) => a.code.localeCompare(b.code));
 
 export const FALLBACK_LANGUAGE = "en";
 
+/**
+ * The locale for dates, numbers and the first day of the week. It follows
+ * the regional format of the system when the system speaks the language of
+ * the app (`en-GB` for English on a British system, so 12 Oct and not Oct 12).
+ * Otherwise, for example French chosen on an English system, it is the
+ * language itself.
+ */
+export function formatLocale(language: string): string {
+  const wanted = language.toLowerCase().split("-")[0];
+  const system = typeof navigator === "undefined" ? [] : (navigator.languages ?? [navigator.language]);
+  return system.find((tag) => tag.toLowerCase().split("-")[0] === wanted) ?? language;
+}
+
 /** The language to use for a setting: "system" or the code of a language. */
 export function resolveLanguage(setting: string): string {
   if (setting !== "system" && resources[setting]) {

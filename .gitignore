@@ -35,3 +35,8 @@ dist-ssr
 !.vscode/extensions.json
 .idea
 .DS_Store
+
+# Test output
+test-results/
+playwright-report/
+tests/e2e/node_modules/

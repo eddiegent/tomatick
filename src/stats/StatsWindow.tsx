@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
+import { formatLocale } from "../i18n";
 import "./stats.css";
 import { useStats, type Period, type Stats } from "./api";
 
@@ -161,7 +162,8 @@ function Today({ stats }: { stats: Stats }) {
 /** The statistics window, opened from the chart button of the widget. */
 export function StatsWindow() {
   const { t, i18n } = useTranslation();
-  const locale = i18n.language;
+  // Dates and numbers follow the regional format of the system.
+  const locale = formatLocale(i18n.language);
   const [period, setPeriod] = useState<Period>("week");
   const [offset, setOffset] = useState(0);
   const [metric, setMetric] = useState<Metric>("completed");

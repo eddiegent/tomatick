@@ -1,0 +1,74 @@
+name: End-to-end
+
+# Drives the real app through tauri-driver on Linux. Kept apart from the main
+# CI so that a slow or flaky run never blocks the regular checks.
+on:
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: e2e-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  e2e:
+    name: End-to-end (ubuntu-24.04)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Linux dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            build-essential \
+            curl \
+            wget \
+            file \
+            libxdo-dev \
+            libssl-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            webkit2gtk-driver \
+            xvfb
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Install tauri-driver
+        run: cargo install tauri-driver --locked
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Build the app
+        run: npm run tauri build -- --debug --no-bundle
+
+      - name: Install the test dependencies
+        working-directory: tests/e2e
+        run: npm install
+
+      - name: Run the end-to-end tests
+        working-directory: tests/e2e
+        shell: bash
+        run: |
+          set +e
+          xvfb-run -a npm test 2>&1 | tee e2e.log
+          status=${PIPESTATUS[0]}
+          if [ "$status" -ne 0 ]; then
+            # Failures as annotations, so they show without opening the log.
+            grep -E "Error|expected|Expected|Received|failed|✖|exited|could not" e2e.log \
+              | head -25 | sed 's/^/::error::/'
+          fi
+          exit "$status"

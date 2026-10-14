@@ -55,6 +55,14 @@ jobs:
       - name: Type-check and build the frontend
         run: npm run build
 
+      - name: Install the browser for the interface tests
+        if: runner.os == 'Linux'
+        run: npx playwright install --with-deps chromium
+
+      - name: Run the interface tests
+        if: runner.os == 'Linux'
+        run: npm run test:ui
+
       - name: Check Rust formatting
         run: cargo fmt --manifest-path src-tauri/Cargo.toml --all -- --check
 
