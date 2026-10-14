@@ -7,7 +7,8 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "tauri": "tauri"
+    "tauri": "tauri",
+    "test:ui": "playwright test"
   },
   "dependencies": {
     "@tauri-apps/api": "^2",
@@ -18,6 +19,7 @@
     "react-i18next": "^17.0.16"
   },
   "devDependencies": {
+    "@playwright/test": "^1.56.1",
     "@tauri-apps/cli": "^2",
     "@types/react": "^19.1.8",
     "@types/react-dom": "^19.1.6",
