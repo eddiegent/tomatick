@@ -68,6 +68,21 @@ test("a finished phase refreshes the window", async ({ page }) => {
     .toBeGreaterThan(before);
 });
 
+test.describe("regional formats", () => {
+  test.use({ locale: "en-GB" });
+
+  test("English on a British system writes the day first", async ({ page }) => {
+    await openApp(page, stats);
+    await expect(page.locator(".range")).toContainText("12 Oct");
+    await expect(page.locator(".range")).toContainText("18 Oct 2026");
+  });
+
+  test("French on a British system uses French formats", async ({ page }) => {
+    await openApp(page, { ...stats, settings: { ...defaultSettings, language: "fr" } });
+    await expect(page.locator(".range")).toContainText("12 oct.");
+  });
+});
+
 test("the statistics follow the language", async ({ page }) => {
   await openApp(page, { ...stats, settings: { ...defaultSettings, language: "fr" } });
   await expect(page.locator(".today .big")).toHaveText("3 sur 8 pomodoros");
