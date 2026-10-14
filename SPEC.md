@@ -175,7 +175,7 @@ A long break is divided into short-break-sized segments, and each segment shows 
 - Any remainder is added to the last segment.
 - Example: long break 20 min, short break 5 min gives 4 segments of 5 min and 4 consecutive exercises. Long break 17 min gives 3 segments (5, 5, 7 min).
 - The rotation carries on into the next break.
-- Moving from one segment to the next updates the label with a light cue (the break-end sound, no overlay and no system notification). This is an assumption, see 20.
+- Moving from one segment to the next updates the label with a light cue (the break-end sound, no overlay and no system notification). Decided and implemented, see 20.
 
 ### 7.4 Where the label appears
 
@@ -224,7 +224,7 @@ Break overlay actions:
 
 Countdown overlay: a "Time's up" message with **Dismiss** and **Restart**. No skip or extend.
 
-There is no strict mode. By default the overlay covers the display that holds the widget (assumption, see 20).
+There is no strict mode. By default the overlay covers the display that holds the widget (decided, see 20).
 
 ## 9. Widget
 
@@ -233,7 +233,7 @@ There is no strict mode. By default the overlay covers the display that holds th
 - Frameless, transparent background, always on top, no taskbar entry (the tray icon is the fallback).
 - Draggable by the tomato body.
 - Position and monitor are remembered and restored on launch (always on, not a setting). If the saved monitor is gone, the widget falls back to the primary display.
-- Three sizes selectable in settings: small, medium, large (suggested starting sizes 120, 180 and 260 px, to be tuned during implementation).
+- Three sizes selectable in settings: small, medium, large (140, 200 and 280 px).
 
 ### 9.2 Appearance
 
@@ -443,23 +443,26 @@ Docusaurus in `/website`, deployed to GitHub Pages by a GitHub Actions workflow,
 10. **i18n:** i18next wiring, English and French files, Rust-side translations.
 11. **Update check, packaging and docs:** release workflow, installers, Docusaurus site, Linux and Wayland testing, 0.1 release.
 
-## 20. Assumptions to confirm
+## 20. Decisions
 
-These were not explicitly decided in the design discussion and should be confirmed or changed:
+These points were not part of the first design discussion. They were proposed as assumptions and have all been confirmed.
 
-2. **Long break segment change:** a light cue (the break-end sound) with no overlay or notification.
-3. **Overlay display:** covers the display that holds the widget (alternative: all displays).
-4. **Daily goal default:** 8 pomodoros.
-5. **Global shortcut defaults:** the key combinations in 13.3.
-6. **Widget sizes:** the pixel sizes in 9.1.
-7. **Settings storage:** in the same SQLite file as the history.
-8. **Extend buttons:** +1 min and +5 min.
-9. **Sound extras:** volume slider and mute toggle are included, ticking is excluded.
-10. **Project name:** Tomatick. Availability checks are summarized in section 21.
+- **Overlay display:** covers the display that holds the widget, not all displays (section 8.4).
+- **Global shortcut defaults:** the key combinations in 13.3.
+- **Settings storage:** in the same SQLite file as the history (section 12).
+- **Extend buttons:** +1 min and +5 min (section 8.4).
+- **Sound extras:** volume slider and mute toggle are included, ticking is excluded (section 8.3).
+- **Project name:** Tomatick. Availability checks are summarized in section 21. The domain names have not been checked.
 
 Decided: only one mode is active at a time, and switching mode resets the timer of the mode being left (section 4).
 
 Decided: a skipped work phase is not counted as a pomodoro but advances the position in the cycle, whether or not it had started (section 5.2).
+
+Decided and implemented: a move to the next segment of a long break plays the break-end sound, with no overlay and no system notification (section 7.3).
+
+Decided and implemented: the daily goal defaults to 8 pomodoros (section 5.1).
+
+Decided and implemented: the widget sizes are 140, 200 and 280 px (section 9.1).
 
 ## 21. Name availability check (2026-10-11)
 
