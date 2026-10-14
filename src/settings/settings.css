@@ -353,3 +353,9 @@ html.settings-window #root {
 .settings button.shortcut.recording {
   outline: 2px solid var(--accent, #d9442b);
 }
+
+.about-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}

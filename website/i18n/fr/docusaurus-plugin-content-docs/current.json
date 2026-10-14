@@ -1,0 +1,10 @@
+{
+  "version.label": {
+    "message": "Prochaine version",
+    "description": "The label for version current"
+  },
+  "sidebar.docs.category.For contributors": {
+    "message": "Pour les contributeurs",
+    "description": "The label for category 'For contributors' in sidebar 'docs'"
+  }
+}
