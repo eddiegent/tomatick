@@ -187,3 +187,11 @@ test("the about section is translated", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "À propos" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Vérifier maintenant" })).toBeVisible();
 });
+
+test("the about section links to the documentation", async ({ page }) => {
+  await openApp(page, settings);
+  await page.getByRole("button", { name: "Documentation" }).click();
+  await expect
+    .poll(async () => (await calls(page)).find((c) => c.cmd === "plugin:opener|open_url")?.args)
+    .toMatchObject({ url: "https://eddiegent.github.io/tomatick/" });
+});

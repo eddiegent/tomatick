@@ -1,0 +1,54 @@
+/* Tomatick colors: the red of the work phase. */
+:root {
+  --ifm-color-primary: #c93a3f;
+  --ifm-color-primary-dark: #b83539;
+  --ifm-color-primary-darker: #b03337;
+  --ifm-color-primary-darkest: #922a2e;
+  --ifm-color-primary-light: #d4474c;
+  --ifm-color-primary-lighter: #d65257;
+  --ifm-color-primary-lightest: #de7a7e;
+  --ifm-code-font-size: 95%;
+  --docusaurus-highlighted-code-line-bg: rgba(0, 0, 0, 0.1);
+}
+
+[data-theme="dark"] {
+  --ifm-color-primary: #ff8a8d;
+  --ifm-color-primary-dark: #ff6f73;
+  --ifm-color-primary-darker: #ff6165;
+  --ifm-color-primary-darkest: #ff2f35;
+  --ifm-color-primary-light: #ffa5a7;
+  --ifm-color-primary-lighter: #ffb3b5;
+  --ifm-color-primary-lightest: #ffd7d8;
+  --docusaurus-highlighted-code-line-bg: rgba(0, 0, 0, 0.3);
+}
+
+/* Images that are rendered from the interface and will be replaced. */
+.replaceable-image {
+  display: block;
+  max-width: 100%;
+  margin: 1rem auto;
+}
+
+/* Documentation images: widgets at their real size, windows within the column. */
+.markdown img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin: 1rem 0;
+}
+
+.markdown img[src*="/widget-"] {
+  width: 200px;
+}
+
+.markdown img[src*="/settings"],
+.markdown img[src*="/statistics"] {
+  max-width: 420px;
+  border: 1px solid var(--ifm-color-emphasis-300);
+  border-radius: 6px;
+}
+
+.markdown img[src*="/overlay-"] {
+  max-width: 640px;
+  border-radius: 6px;
+}

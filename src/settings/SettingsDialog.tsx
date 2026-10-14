@@ -294,6 +294,7 @@ function closeWindow() {
 }
 
 const REPOSITORY_URL = "https://github.com/eddiegent/tomatick";
+const DOCUMENTATION_URL = "https://eddiegent.github.io/tomatick/";
 
 /** The About section: the version, a newer version if there is one, and a manual check. */
 function AboutSection() {
@@ -323,15 +324,28 @@ function AboutSection() {
       <h2>{t("settings.about")}</h2>
       {status && <p>{t("settings.version", { version: status.current })}</p>}
       <p className="help">{t("settings.license")}</p>
-      <button
-        type="button"
-        className="secondary"
-        onClick={() => {
-          openUrl(REPOSITORY_URL).catch(() => {});
-        }}
-      >
-        {t("settings.repository")}
-      </button>
+      <div className="about-links">
+        <button
+          type="button"
+          className="secondary"
+          onClick={() => {
+            // The site has a French version under /fr/.
+            const url = i18n.language === "fr" ? `${DOCUMENTATION_URL}fr/` : DOCUMENTATION_URL;
+            openUrl(url).catch(() => {});
+          }}
+        >
+          {t("settings.documentation")}
+        </button>
+        <button
+          type="button"
+          className="secondary"
+          onClick={() => {
+            openUrl(REPOSITORY_URL).catch(() => {});
+          }}
+        >
+          {t("settings.repository")}
+        </button>
+      </div>
       <div className="update" aria-live="polite">
         {available && <p className="notice">{t("settings.updateAvailable", { version: available.version })}</p>}
         {!available && checkedAt !== null && !failed && <p className="help">{t("settings.upToDate")}</p>}

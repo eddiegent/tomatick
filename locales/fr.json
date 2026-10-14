@@ -127,6 +127,7 @@
     "about": "À propos",
     "version": "Version {{version}}",
     "license": "Logiciel libre et open source, licence MIT.",
+    "documentation": "Documentation",
     "repository": "Code source sur GitHub",
     "updateAvailable": "La version {{version}} est disponible.",
     "updateGet": "Ouvrir la page des versions",

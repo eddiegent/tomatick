@@ -2,13 +2,13 @@
 
 A free, open source Pomodoro timer for Windows, macOS and Linux, built around a small always-on-top tomato widget.
 
-> **Status: early development.** There is no released version yet. The design is written down in [SPEC.md](SPEC.md), and the project skeleton (Tauri, React, CI), the timer engine, the tomato widget, the settings dialog, and the alerts (notifications, sounds and the full-screen overlay) are in place. History is next.
+> **Status: first release in preparation.** Every feature of the first version is in place. The installers are published on the [releases page](https://github.com/eddiegent/tomatick/releases) once version 0.1.0 is tagged. The builds are not signed, so Windows and macOS warn on first launch. The [documentation](https://eddiegent.github.io/tomatick/) explains how to continue.
 
 ## What it is
 
 Tomatick is a pure timer. No task list, no accounts, no cloud. A tomato sits on your desktop with a digital countdown in the middle, and it gets out of your way.
 
-## Planned features
+## Features
 
 - **Tomato widget:** always on top, three sizes (small, medium, large), color by phase (red for work, green for short break, blue for long break), a progress ring, and a clearly visible paused state. Controls appear when you hover over it.
 - **Fully customizable Pomodoro cycles:** the classic 25/5/15 profile is the default, with a one-click reset back to it. Auto-start of the next phase is a toggle, and you can pause at any time (for lunch, a call).
@@ -16,17 +16,17 @@ Tomatick is a pure timer. No task list, no accounts, no cloud. A tomato sits on 
 - **Break exercises:** keep an ordered list (planks, sit-ups, stretches) and the app rotates through it. A long break is split into short-break-sized segments, each with its own exercise.
 - **Configurable alerts:** system notification, sound, full-screen overlay and bring-to-front, set separately for each event. Built-in sounds or your own audio files.
 - **History and statistics:** daily, weekly and monthly charts, streaks, completion rate and best time of day, all stored locally in SQLite.
-- **Desktop integration:** tray icon, launch at login, global keyboard shortcuts, and sleep and lock handling.
+- **Desktop integration:** tray icon, launch at login, global keyboard shortcuts, and pausing when the computer sleeps.
 - **Translation-ready:** English and French at launch, with simple JSON files for adding more languages.
 
 ## Platforms
 
-| Platform | Status |
+| Platform | Installer |
 |---|---|
-| Windows 10 and 11 | Planned |
-| macOS | Planned |
-| Linux (X11) | Planned |
-| Linux (Wayland) | Planned, with limits: always-on-top and global shortcuts depend on the compositor |
+| Windows 10 and 11 | `.exe` |
+| macOS (Intel and Apple silicon) | `.dmg` |
+| Linux (X11) | AppImage and `.deb` |
+| Linux (Wayland) | AppImage and `.deb`, with limits: always-on-top and global shortcuts depend on the compositor |
 
 ## Tech stack
 
@@ -40,9 +40,11 @@ The app runs in the operating system's built-in webview. No browser is needed.
 
 ## Documentation
 
+The documentation is at **[eddiegent.github.io/tomatick](https://eddiegent.github.io/tomatick/)**, in English and French: installation, user guide, configuration reference, FAQ, and guides for contributors (architecture and translation). The source is in the `website` folder.
+
 The full specification is in [SPEC.md](SPEC.md). It covers the timer behavior, alerts, widget design, statistics, data model, architecture and build milestones.
 
-A documentation website is planned in the `website` folder and will be published with GitHub Pages.
+The images of the site are rendered from the interface with sample data, and are meant to be replaced with real captures: see `website/static/img/screenshots/README.md`.
 
 ## Development
 
@@ -67,21 +69,23 @@ The timer engine (`src-tauri/src/engine`) is plain Rust with no dependency on Ta
 cargo test --manifest-path src-tauri/Cargo.toml
 ```
 
-### Trying the widget
+### Trying the app
 
-`npm run tauri dev` opens the tomato: a frameless, transparent, always-on-top window. Drag it by its body and hover over it to reveal the controls: the top row has the mode switch, statistics (not available yet) and the cog, which opens the settings window. The bottom row has play or pause, skip and reset.
+`npm run tauri dev` opens the tomato: a frameless, transparent, always-on-top window. Drag it by its body and hover over it to reveal the controls. The [user guide](https://eddiegent.github.io/tomatick/docs/user-guide) describes them all. Settings and history are stored in a SQLite file in the application data folder, and the tray menu has **Quit**.
 
-In countdown mode, click the time while the timer is idle to type a new duration (minutes, or `m:ss`) or pick a preset. The settings window holds the cycle durations, auto-start, the widget size, the countdown starting value and the break exercise list, with a button to reset the cycle to the classic 25/5/15 profile. Settings are stored in a SQLite file in the application data folder.
+Tests:
 
-There is no tray icon yet, so close the app with `Alt+F4` (Windows and Linux) or `Cmd+Q` (macOS), or from the taskbar or dock.
+```
+npm run test:ui        # the interface, against a fake backend (Playwright)
+```
 
-Continuous integration builds the app on Windows, macOS and Linux for every push to `main` and every pull request.
+The end-to-end tests of the real app are described in `tests/e2e/README.md`. The documentation site is built with `cd website && npm install && npm run build`.
+
+Continuous integration builds the app on Windows, macOS and Linux for every push to `main` and every pull request. Pushing a tag such as `v0.1.0` builds the installers and prepares a draft release.
 
 ## Contributing
 
-The app does not do anything useful yet, so code contributions are premature, but feedback on the specification is welcome. Open an issue to discuss a change or a question about the design.
-
-Once the timer engine and widget land, this section will describe how to add a translation.
+Bug reports, ideas, translations and code are welcome. For anything bigger than a small fix, open an issue first. The [contributing guide](https://eddiegent.github.io/tomatick/docs/contributing) explains how to run and test the project, and the [translation guide](https://eddiegent.github.io/tomatick/docs/translation) shows how to add a language with one JSON file.
 
 ## License
 
