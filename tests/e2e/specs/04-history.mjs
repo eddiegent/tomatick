@@ -19,6 +19,8 @@ describe("the history", () => {
     expect(stats.streak.current).toBe(1);
     expect(stats.hours.reduce((a, b) => a + b, 0)).toBe(1);
     expect(stats.completion.completed).toBe(1);
+    // The reset of a started phase in 01-first-run.
+    expect(stats.completion.interrupted).toBe(1);
   });
 
   it("leaves a phase running when the app is stopped", async () => {

@@ -14,7 +14,9 @@ describe("the history after a relaunch", () => {
 
   it("recorded the phase that was running as interrupted", async () => {
     const stats = await call("stats_get", week);
-    expect(stats.completion.interrupted).toBe(1);
+    // One from the reset of a started phase in 01-first-run, one recovered
+    // from the phase that was running when the app was stopped.
+    expect(stats.completion.interrupted).toBe(2);
     // An interrupted phase is not a pomodoro.
     expect(stats.totals.completed).toBe(1);
   });
