@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { calls, defaultSettings, okStatus, openApp } from "./mock";
+import { calls, defaultSettings, idleUpdate, okStatus, openApp } from "./mock";
 
 const settings = { label: "settings" };
 
@@ -117,4 +117,73 @@ test("the languages come from the locale files", async ({ page }) => {
   await openApp(page, settings);
   const options = await page.getByLabel("Language").locator("option").allTextContents();
   expect(options).toEqual(["Same as the system", "English", "Français"]);
+});
+
+test("the update check can be switched off and the choice is saved", async ({ page }) => {
+  await openApp(page, settings);
+  const toggle = page.getByLabel("Check for new versions");
+  await expect(toggle).toBeChecked();
+  await toggle.uncheck();
+  await page.getByRole("button", { name: "Save" }).click();
+  await expect.poll(() => lastSave(page)).toBeDefined();
+  expect((await lastSave(page))!.settings.check_for_updates).toBe(false);
+});
+
+test("the about section shows the version and no notice before a check", async ({ page }) => {
+  await openApp(page, settings);
+  await expect(page.getByRole("heading", { name: "About" })).toBeVisible();
+  await expect(page.getByText("Version 0.1.0")).toBeVisible();
+  await expect(page.getByText(/is available\./)).toHaveCount(0);
+  await expect(page.getByText("Tomatick is up to date.")).toHaveCount(0);
+});
+
+test("a newer version is announced with a link to its page", async ({ page }) => {
+  const found = {
+    ...idleUpdate,
+    available: { version: "0.2.0", url: "https://github.com/eddiegent/tomatick/releases/tag/v0.2.0" },
+    last_checked: 1_760_000_000,
+  };
+  await openApp(page, { ...settings, update: found });
+  await expect(page.getByText("Version 0.2.0 is available.")).toBeVisible();
+  await page.getByRole("button", { name: "Open the releases page" }).click();
+  await expect.poll(async () => (await calls(page)).some((c) => c.cmd === "update_open")).toBe(true);
+});
+
+test("check now reports when the app is up to date", async ({ page }) => {
+  await openApp(page, {
+    ...settings,
+    updateAfterCheck: { ...idleUpdate, last_checked: 1_760_000_000 },
+  });
+  await page.getByRole("button", { name: "Check now" }).click();
+  await expect(page.getByText("Tomatick is up to date.")).toBeVisible();
+  await expect(page.getByText(/Last checked:/)).toBeVisible();
+  expect((await calls(page)).filter((c) => c.cmd === "update_check")).toHaveLength(1);
+});
+
+test("check now picks up a newer version", async ({ page }) => {
+  await openApp(page, {
+    ...settings,
+    updateAfterCheck: {
+      ...idleUpdate,
+      available: { version: "0.3.0", url: "https://github.com/eddiegent/tomatick/releases" },
+      last_checked: 1_760_000_000,
+    },
+  });
+  await page.getByRole("button", { name: "Check now" }).click();
+  await expect(page.getByText("Version 0.3.0 is available.")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Open the releases page" })).toBeVisible();
+});
+
+test("a check that fails says so and does not close anything", async ({ page }) => {
+  await openApp(page, { ...settings, updateCheckError: "offline" });
+  await page.getByRole("button", { name: "Check now" }).click();
+  await expect(page.getByText("Could not check for new versions.")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Check now" })).toBeEnabled();
+  await expect(page.getByRole("button", { name: "Save" })).toBeEnabled();
+});
+
+test("the about section is translated", async ({ page }) => {
+  await openApp(page, { ...settings, settings: { ...defaultSettings, language: "fr" } });
+  await expect(page.getByRole("heading", { name: "À propos" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Vérifier maintenant" })).toBeVisible();
 });

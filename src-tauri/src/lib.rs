@@ -8,6 +8,7 @@ pub mod power;
 pub mod shortcuts;
 pub mod storage;
 pub mod tray;
+pub mod updater;
 
 use std::sync::{Mutex, MutexGuard};
 use std::thread;
@@ -23,6 +24,7 @@ use tauri_plugin_autostart::{MacosLauncher, ManagerExt as _};
 use tauri_plugin_dialog::DialogExt;
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutState};
 use tauri_plugin_notification::NotificationExt;
+use tauri_plugin_opener::OpenerExt;
 
 use alerts::{SOUND_EXTENSIONS, SOUNDS_DIR};
 use engine::{Engine, EngineState, Event, Exercise, Mode, Snapshot, SystemClock, TimerSettings};
@@ -32,6 +34,7 @@ use power::{GapDetector, PowerEvent, PowerListener};
 use shortcuts::{ShortcutAction, ShortcutSettings};
 use storage::{AppSettings, DEFAULT_DAILY_GOAL, Store, clean_exercises};
 use tray::Action;
+use updater::{CHECK_INTERVAL, FIRST_CHECK_DELAY, UpdateStatus, Updater};
 
 /// The widget is checked against the screens every this many ticks (5 s).
 const SCREEN_CHECK_TICKS: u32 = 20;
@@ -51,6 +54,10 @@ const SETTINGS_EVENT: &str = "settings:changed";
 /// Emitted after a phase was added to the history, for an open statistics
 /// window to refresh itself. No payload.
 const HISTORY_EVENT: &str = "history:changed";
+
+/// Emitted after an update check ended or the notice was cleared.
+/// Payload: [`UpdateStatus`].
+const UPDATE_EVENT: &str = "update:changed";
 
 /// Label of the settings window.
 const SETTINGS_WINDOW: &str = "settings";
@@ -232,7 +239,79 @@ pub(crate) fn run_action(app: &AppHandle, action: Action) {
                 }
             });
         }
+        Action::OpenUpdatePage => open_update_page(app),
         Action::Quit => app.exit(0),
+    }
+}
+
+/// Opens the page of the newer release in the browser. The link was checked
+/// when the release was read (see `updater::evaluate`).
+fn open_update_page(app: &AppHandle) {
+    let url = app
+        .state::<Updater>()
+        .status()
+        .available
+        .map_or_else(|| updater::RELEASES_PAGE.to_string(), |found| found.url);
+    if let Err(error) = app.opener().open_url(url, None::<&str>) {
+        eprintln!("Tomatick: cannot open the releases page: {error}");
+    }
+}
+
+/// Tells the windows and the tray what the update check found.
+fn publish_update(app: &AppHandle, status: &UpdateStatus) {
+    let _ = app.emit(UPDATE_EVENT, status);
+    let snapshot = lock(&app.state::<SharedEngine>()).snapshot();
+    tray::refresh(app, &snapshot, widget_visible(app), current_language(app));
+}
+
+/// Asks GitHub for the latest release and publishes the answer. Blocks, so
+/// call it from a thread of its own. If a check is already running, this
+/// does nothing and returns the state as it is.
+fn run_update_check(app: &AppHandle) -> UpdateStatus {
+    let updater = app.state::<Updater>();
+    let now = unix_now_ms() / 1000;
+    match updater.check(updater::fetch_latest, now) {
+        Some(status) => {
+            publish_update(app, &status);
+            status
+        }
+        None => updater.status(),
+    }
+}
+
+/// Checks once after launch and then every day, while the setting is on.
+/// A check that fails is silent: the next one tries again.
+fn spawn_update_checker(app: AppHandle) {
+    thread::spawn(move || {
+        thread::sleep(FIRST_CHECK_DELAY);
+        loop {
+            let enabled = {
+                let store = app.state::<SharedStore>();
+                lock_store(&store)
+                    .load_settings()
+                    .unwrap_or_default()
+                    .check_for_updates
+            };
+            if enabled {
+                run_update_check(&app);
+            }
+            thread::sleep(CHECK_INTERVAL);
+        }
+    });
+}
+
+/// Reacts to the update check being switched on or off in the settings: a
+/// check starts right away when it is switched on, and a notice that was
+/// found is forgotten when it is switched off.
+fn apply_update_check(app: &AppHandle, was_on: bool, is_on: bool) {
+    if is_on && !was_on {
+        let app = app.clone();
+        thread::spawn(move || {
+            run_update_check(&app);
+        });
+    } else if was_on && !is_on {
+        let status = app.state::<Updater>().clear();
+        publish_update(app, &status);
     }
 }
 
@@ -714,6 +793,7 @@ fn settings_save(
 
     apply_shortcuts(&app, &settings.shortcuts);
     apply_autostart(&app, settings.launch_at_login);
+    apply_update_check(&app, previous.check_for_updates, settings.check_for_updates);
 
     let payload = SettingsPayload {
         settings,
@@ -723,7 +803,27 @@ fn settings_save(
     Ok(payload)
 }
 
-/// Opens the settings window, or brings it to the front if it is open.
+/// What the update check knows: the running version, and a newer one if found.
+#[tauri::command]
+fn update_status(updater: State<'_, Updater>) -> UpdateStatus {
+    updater.status()
+}
+
+/// The "Check now" button. It works even when the automatic check is off,
+/// because the user asked for it.
+#[tauri::command]
+async fn update_check(app: AppHandle) -> Result<UpdateStatus, String> {
+    tauri::async_runtime::spawn_blocking(move || run_update_check(&app))
+        .await
+        .map_err(|error| error.to_string())
+}
+
+/// Opens the page of the newer release in the browser.
+#[tauri::command]
+fn update_open(app: AppHandle) {
+    open_update_page(&app);
+}
+
 /// The statistics of a day, a week or a month, in the local time.
 #[tauri::command]
 fn stats_get(
@@ -773,6 +873,7 @@ async fn settings_open(app: AppHandle) -> Result<(), String> {
     open_settings_window(&app)
 }
 
+/// Opens the settings window, or brings it to the front if it is open.
 fn open_settings_window(app: &AppHandle) -> Result<(), String> {
     if let Some(window) = app.get_webview_window(SETTINGS_WINDOW) {
         let _ = window.unminimize();
@@ -915,6 +1016,7 @@ pub fn run() {
             app.manage(Mutex::new(engine));
             app.manage(Mutex::new(store));
             app.manage(Desktop::default());
+            app.manage(Updater::new(&app.package_info().version.to_string()));
             apply_language(app.handle(), &settings.language);
             apply_shortcuts(app.handle(), &settings.shortcuts);
             if let Err(error) = tray::build(app.handle(), current_language(app.handle())) {
@@ -923,6 +1025,7 @@ pub fn run() {
             // Some systems ask the user once; elsewhere this is always granted.
             let _ = app.notification().request_permission();
             spawn_ticker(app.handle().clone());
+            spawn_update_checker(app.handle().clone());
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -949,6 +1052,9 @@ pub fn run() {
             stats_open,
             desktop_status,
             overlay_preview,
+            update_status,
+            update_check,
+            update_open,
         ])
         .build(tauri::generate_context!())
         .expect("error while building Tomatick")
