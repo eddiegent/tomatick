@@ -238,6 +238,27 @@ html.settings-window #root {
   gap: 8px;
 }
 
+/* ----- about and updates ----- */
+
+.settings .update {
+  margin: 10px 0 8px;
+}
+
+.settings .update p {
+  margin: 4px 0;
+}
+
+.settings .update .notice {
+  color: inherit;
+  font-weight: 600;
+}
+
+.settings .update-buttons {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
 .settings .buttons .left {
   margin-right: auto;
 }

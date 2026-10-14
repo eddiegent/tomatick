@@ -45,6 +45,8 @@ export interface AppSettings {
   daily_goal: number;
   /** Start Tomatick when the user logs in. */
   launch_at_login: boolean;
+  /** Look for a newer release on launch and then every day. */
+  check_for_updates: boolean;
   shortcuts: Shortcuts;
   /** "system", or the code of a language from /locales. */
   language: string;
@@ -77,6 +79,61 @@ export interface DesktopStatus {
 export const desktopApi = {
   status: () => invoke<DesktopStatus>("desktop_status"),
 };
+
+/** Mirrors `UpdateStatus` in src-tauri/src/updater.rs. */
+export interface UpdateStatus {
+  /** The running version. */
+  current: string;
+  /** A release newer than the running version, if one was found. */
+  available: { version: string; url: string } | null;
+  checking: boolean;
+  /** Unix seconds of the last check that got an answer. */
+  last_checked: number | null;
+  /** Set when the last check failed. */
+  error: string | null;
+}
+
+/** Commands for the update check. It only looks: nothing is downloaded. */
+export const updateApi = {
+  status: () => invoke<UpdateStatus>("update_status"),
+  /** Checks now, even when the automatic check is off. */
+  check: () => invoke<UpdateStatus>("update_check"),
+  /** Opens the page of the newer release in the browser. */
+  open: () => invoke<void>("update_open"),
+};
+
+/** What the update check knows, kept up to date as checks end. */
+export function useUpdateStatus(): UpdateStatus | null {
+  const [status, setStatus] = useState<UpdateStatus | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    let unlisten: UnlistenFn | undefined;
+
+    listen<UpdateStatus>("update:changed", (e) => setStatus(e.payload)).then((fn) => {
+      if (active) {
+        unlisten = fn;
+      } else {
+        fn();
+      }
+    });
+    updateApi
+      .status()
+      .then((initial) => {
+        if (active) {
+          setStatus((current) => current ?? initial);
+        }
+      })
+      .catch(() => {});
+
+    return () => {
+      active = false;
+      unlisten?.();
+    };
+  }, []);
+
+  return status;
+}
 
 /** Commands for the custom alert sounds. */
 export const soundApi = {

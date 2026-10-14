@@ -28,6 +28,7 @@ export const defaultSettings = {
   countdown_presets: [300, 600, 900, 1800],
   daily_goal: 8,
   launch_at_login: false,
+  check_for_updates: true,
   shortcuts: {
     start_pause: "CommandOrControl+Alt+P",
     skip: "CommandOrControl+Alt+N",
@@ -82,6 +83,15 @@ export const okStatus = {
   autostart_error: null,
 };
 
+/** What the update check knows before any check ran. */
+export const idleUpdate = {
+  current: "0.1.0",
+  available: null,
+  checking: false,
+  last_checked: null,
+  error: null,
+};
+
 export interface MockOptions {
   /** The window label: main, settings, stats or overlay. */
   label?: string;
@@ -93,6 +103,12 @@ export interface MockOptions {
   statusAfterSave?: object;
   /** Makes `settings_save` fail with this message. */
   saveError?: string;
+  /** What the update check reports at the start. */
+  update?: object;
+  /** What the update check reports once "Check now" ran. */
+  updateAfterCheck?: object;
+  /** Makes `update_check` fail with this message. */
+  updateCheckError?: string;
   /** Query string to open the page with (the overlay reads it). */
   query?: string;
 }
@@ -110,6 +126,7 @@ export async function openApp(page: Page, options: MockOptions = {}): Promise<vo
     snapshot: idleWork,
     stats: weekStats,
     status: okStatus,
+    update: idleUpdate,
     ...options,
   };
   await page.addInitScript((opts) => {
@@ -120,6 +137,7 @@ export async function openApp(page: Page, options: MockOptions = {}): Promise<vo
       exercises: [{ name: "Plank", amount: "30 s" }],
       snapshot: opts.snapshot,
       status: opts.status,
+      update: opts.update,
       calls: [] as { cmd: string; args: unknown }[],
       listeners: {} as Record<string, { handler: number; id: number }[]>,
       callbacks: {} as Record<number, (e: unknown) => void>,
@@ -175,6 +193,18 @@ export async function openApp(page: Page, options: MockOptions = {}): Promise<vo
           }
           case "desktop_status":
             return state.status;
+          case "update_status":
+            return state.update;
+          case "update_check": {
+            if (opts.updateCheckError) {
+              throw opts.updateCheckError;
+            }
+            if (opts.updateAfterCheck) {
+              state.update = opts.updateAfterCheck;
+              emit("update:changed", state.update);
+            }
+            return state.update;
+          }
           case "engine_snapshot":
             return state.snapshot;
           case "engine_toggle": {

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import { openUrl } from "@tauri-apps/plugin-opener";
 import "./settings.css";
 import { playSound } from "../alerts/sound";
 import type { AlertEvent, Exercise, SleepBehavior, TimerSettings } from "../engine/api";
@@ -12,6 +13,8 @@ import {
   overlayApi,
   settingsApi,
   soundApi,
+  updateApi,
+  useUpdateStatus,
   type AlertSettings,
   type AppSettings,
   type BuiltinSound,
@@ -70,6 +73,7 @@ interface Form {
   sessions: string;
   goal: string;
   launch: boolean;
+  checkUpdates: boolean;
   language: string;
   shortcuts: Shortcuts;
   autoStart: boolean;
@@ -87,6 +91,7 @@ function toForm(settings: AppSettings, exercises: Exercise[]): Form {
     size: settings.widget_size,
     goal: String(settings.daily_goal),
     launch: settings.launch_at_login,
+    checkUpdates: settings.check_for_updates,
     language: settings.language,
     shortcuts: settings.shortcuts,
     countdown: formatDuration(settings.countdown_secs),
@@ -186,6 +191,7 @@ function fromForm(form: Form, t: TFunction): { settings: AppSettings } | { error
       countdown_presets: presets,
       daily_goal: goal,
       launch_at_login: form.launch,
+      check_for_updates: form.checkUpdates,
       language: form.language,
       shortcuts: form.shortcuts,
       alerts: form.alerts,
@@ -285,6 +291,82 @@ function closeWindow() {
   getCurrentWindow()
     .close()
     .catch(() => {});
+}
+
+const REPOSITORY_URL = "https://github.com/eddiegent/tomatick";
+
+/** The About section: the version, a newer version if there is one, and a manual check. */
+function AboutSection() {
+  const { t, i18n } = useTranslation();
+  const status = useUpdateStatus();
+  const [checking, setChecking] = useState(false);
+  const [checkFailed, setCheckFailed] = useState(false);
+
+  const checkNow = async () => {
+    setChecking(true);
+    setCheckFailed(false);
+    try {
+      await updateApi.check();
+    } catch {
+      setCheckFailed(true);
+    } finally {
+      setChecking(false);
+    }
+  };
+
+  const available = status?.available ?? null;
+  const failed = checkFailed || Boolean(status?.error);
+  const checkedAt = status?.last_checked ?? null;
+
+  return (
+    <section>
+      <h2>{t("settings.about")}</h2>
+      {status && <p>{t("settings.version", { version: status.current })}</p>}
+      <p className="help">{t("settings.license")}</p>
+      <button
+        type="button"
+        className="secondary"
+        onClick={() => {
+          openUrl(REPOSITORY_URL).catch(() => {});
+        }}
+      >
+        {t("settings.repository")}
+      </button>
+      <div className="update" aria-live="polite">
+        {available && <p className="notice">{t("settings.updateAvailable", { version: available.version })}</p>}
+        {!available && checkedAt !== null && !failed && <p className="help">{t("settings.upToDate")}</p>}
+        {failed && <p className="error">{t("settings.updateFailed")}</p>}
+        {checkedAt !== null && (
+          <p className="help">
+            {t("settings.updateLastChecked", {
+              time: new Date(checkedAt * 1000).toLocaleString(i18n.language),
+            })}
+          </p>
+        )}
+      </div>
+      <div className="update-buttons">
+        {available && (
+          <button
+            type="button"
+            className="primary"
+            onClick={() => {
+              updateApi.open().catch(() => {});
+            }}
+          >
+            {t("settings.updateGet")}
+          </button>
+        )}
+        <button
+          type="button"
+          className="secondary"
+          disabled={checking || Boolean(status?.checking)}
+          onClick={checkNow}
+        >
+          {checking ? t("settings.updateChecking") : t("settings.updateCheckNow")}
+        </button>
+      </div>
+    </section>
+  );
 }
 
 /** The settings window, opened from the cog of the widget. */
@@ -555,6 +637,15 @@ export function SettingsDialog() {
           {desktop?.autostart_error && (
             <p className="error">{`${t("settings.launchFailed")}${desktop.autostart_error}`}</p>
           )}
+          <label className="check">
+            <input
+              type="checkbox"
+              checked={form.checkUpdates}
+              onChange={(e) => change({ checkUpdates: e.target.checked })}
+            />
+            {t("settings.checkUpdates")}
+          </label>
+          <p className="help">{t("settings.checkUpdatesHelp")}</p>
           <Field label={t("settings.language")}>
             <select value={form.language} onChange={(e) => change({ language: e.target.value })}>
               <option value="system">{t("settings.languageSystem")}</option>
@@ -834,6 +925,8 @@ export function SettingsDialog() {
             {t("settings.add")}
           </button>
         </section>
+
+        <AboutSection />
       </main>
 
       <footer>

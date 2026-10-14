@@ -178,6 +178,8 @@ pub struct AppSettings {
     pub daily_goal: u32,
     /// Start Tomatick when the user logs in.
     pub launch_at_login: bool,
+    /// Look for a newer release on launch and then every day.
+    pub check_for_updates: bool,
     pub shortcuts: ShortcutSettings,
     /// "system", or the code of a language that has a locale file.
     pub language: String,
@@ -193,6 +195,7 @@ impl Default for AppSettings {
             countdown_presets: DEFAULT_COUNTDOWN_PRESETS.to_vec(),
             daily_goal: DEFAULT_DAILY_GOAL,
             launch_at_login: false,
+            check_for_updates: true,
             shortcuts: ShortcutSettings::default(),
             language: i18n::SYSTEM.to_string(),
             alerts: AlertSettings::default(),
@@ -452,6 +455,29 @@ mod tests {
         assert_eq!(loaded.daily_goal, 3);
         assert_eq!(loaded.shortcuts, ShortcutSettings::default());
         assert!(!loaded.launch_at_login);
+    }
+
+    #[test]
+    fn the_update_check_is_on_by_default_and_the_choice_is_kept() {
+        assert!(AppSettings::default().check_for_updates);
+
+        // Settings stored before this field existed get the default.
+        let store = Store::open_in_memory().unwrap();
+        store
+            .connection
+            .execute(
+                "INSERT INTO settings (key, value) VALUES ('app', '{\"daily_goal\": 3}')",
+                [],
+            )
+            .unwrap();
+        assert!(store.load_settings().unwrap().check_for_updates);
+
+        let settings = AppSettings {
+            check_for_updates: false,
+            ..AppSettings::default()
+        };
+        store.save_settings(&settings).unwrap();
+        assert!(!store.load_settings().unwrap().check_for_updates);
     }
 
     #[test]

@@ -121,7 +121,20 @@
     "errSessions": "Sessions must be a whole number from {{min}} to {{max}}.",
     "errGoal": "The daily goal must be a whole number from {{min}} to {{max}}.",
     "errCountdown": "The countdown must be between 0:01 and 23:59:59.",
-    "errPresets": "Quick choices must be one to {{max}} durations between 0:01 and 23:59:59, separated by commas."
+    "errPresets": "Quick choices must be one to {{max}} durations between 0:01 and 23:59:59, separated by commas.",
+    "checkUpdates": "Check for new versions",
+    "checkUpdatesHelp": "Once a day, Tomatick asks GitHub for the latest release. This is the only network request the app makes. Nothing is downloaded or installed for you.",
+    "about": "About",
+    "version": "Version {{version}}",
+    "license": "Free and open source software, MIT license.",
+    "repository": "Source code on GitHub",
+    "updateAvailable": "Version {{version}} is available.",
+    "updateGet": "Open the releases page",
+    "upToDate": "Tomatick is up to date.",
+    "updateFailed": "Could not check for new versions.",
+    "updateLastChecked": "Last checked: {{time}}",
+    "updateCheckNow": "Check now",
+    "updateChecking": "Checking..."
   },
   "stats": {
     "title": "Statistics",
@@ -171,7 +184,8 @@
     "stats": "Statistics",
     "settings": "Settings",
     "quit": "Quit Tomatick",
-    "tooltip": "Tomatick"
+    "tooltip": "Tomatick",
+    "update": "Version {{version}} is available"
   },
   "notification": {
     "workEnd": {
