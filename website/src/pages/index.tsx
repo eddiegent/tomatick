@@ -3,6 +3,7 @@ import Layout from "@theme/Layout";
 import Link from "@docusaurus/Link";
 import Translate, { translate } from "@docusaurus/Translate";
 import useBaseUrl from "@docusaurus/useBaseUrl";
+import useDocusaurusContext from "@docusaurus/useDocusaurusContext";
 import styles from "./index.module.css";
 
 const FEATURES = [
@@ -65,7 +66,16 @@ const FEATURES = [
   },
 ];
 
+/** The images are rendered once per language, French ones in the fr folder. */
+function useScreenshot(name: string): string {
+  const { i18n } = useDocusaurusContext();
+  const folder = i18n.currentLocale === "en" ? "" : `${i18n.currentLocale}/`;
+  return useBaseUrl(`/img/screenshots/${folder}${name}.png`);
+}
+
 function Hero(): ReactNode {
+  const work = useScreenshot("widget-work");
+  const shortBreak = useScreenshot("widget-short-break");
   return (
     <header className={styles.hero}>
       <div className={`container ${styles.heroInner}`}>
@@ -94,14 +104,14 @@ function Hero(): ReactNode {
         <div className={styles.heroImages}>
           <img
             className="replaceable-image"
-            src={useBaseUrl("/img/screenshots/widget-work.png")}
+            src={work}
             alt={translate({ id: "home.alt.work", message: "The Tomatick widget during a work phase" })}
             width={200}
             height={200}
           />
           <img
             className="replaceable-image"
-            src={useBaseUrl("/img/screenshots/widget-short-break.png")}
+            src={shortBreak}
             alt={translate({ id: "home.alt.break", message: "The Tomatick widget during a short break" })}
             width={200}
             height={200}
@@ -122,7 +132,7 @@ function Feature({ feature, flip }: { feature: (typeof FEATURES)[number]; flip: 
       <div className={styles.featureImage}>
         <img
           className="replaceable-image"
-          src={useBaseUrl(`/img/screenshots/${feature.image}.png`)}
+          src={useScreenshot(feature.image)}
           alt=""
           loading="lazy"
         />

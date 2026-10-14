@@ -8,14 +8,14 @@ sidebar_position: 2
 Tomatick est un simple minuteur. Il n'y a ni liste de tâches ni compte. Cette page présente tout ce que vous pouvez faire avec.
 
 :::note À propos des images
-Les images de cette documentation ont été générées à partir de l'interface avec des données d'exemple. Ce ne sont pas des captures d'un vrai bureau, et elles seront remplacées. Elles montrent l'application en anglais.
+Les images de cette documentation ont été générées à partir de l'interface avec des données d'exemple. Ce ne sont pas des captures d'un vrai bureau, et elles seront remplacées.
 :::
 
 ## Le widget
 
 Le widget est une tomate avec le temps restant au centre. Il n'a pas de cadre de fenêtre, reste au-dessus de vos autres fenêtres, et vous pouvez le déplacer en le saisissant par le corps. Tomatick se souvient de l'endroit où vous l'avez posé, écran compris. Si cet écran n'est plus là au prochain démarrage, le widget passe sur l'écran principal.
 
-![Le widget pendant une phase de travail](/img/screenshots/widget-work.png)
+![Le widget pendant une phase de travail](/img/screenshots/fr/widget-work.png)
 
 La couleur indique ce qui se passe, et un anneau autour de la tomate montre où vous en êtes dans la phase.
 
@@ -26,15 +26,15 @@ La couleur indique ce qui se passe, et un anneau autour de la tomate montre où 
 | Bleu | Pause longue |
 | Ambre | Minuteur |
 
-![Pause courte](/img/screenshots/widget-short-break.png)
+![Pause courte](/img/screenshots/fr/widget-short-break.png)
 
-Le petit nombre en bas, comme `2/4`, indique la position dans le cycle. Choisissez une taille dans les Réglages : petit (140 px), moyen (200 px) ou grand (280 px). Aux tailles moyenne et grande, l'exercice d'une pause est affiché sous le temps. Au petit format, il est dans l'infobulle.
+Le petit nombre au-dessus du temps, comme `2/4`, indique la position dans le cycle. Choisissez une taille dans les Réglages : petit (140 px), moyen (200 px) ou grand (280 px). Aux tailles moyenne et grande, l'exercice d'une pause est affiché sous le temps. Au petit format, il est dans l'infobulle.
 
 ### Les boutons
 
 Passez la souris sur le widget : les boutons apparaissent en fondu autour de la tomate.
 
-![Le widget avec ses boutons](/img/screenshots/widget-controls.png)
+![Le widget avec ses boutons](/img/screenshots/fr/widget-controls.png)
 
 | Bouton | Action |
 |---|---|
@@ -47,7 +47,7 @@ Passez la souris sur le widget : les boutons apparaissent en fondu autour de la 
 
 Un minuteur en pause est atténué et affiche un symbole de pause. Si c'est l'ordinateur qui l'a mis en pause en se mettant en veille, une petite lune s'affiche aussi, pour que vous sachiez que ce n'est pas vous.
 
-![Un minuteur en pause](/img/screenshots/widget-paused.png)
+![Un minuteur en pause](/img/screenshots/fr/widget-paused.png)
 
 ## Mode Pomodoro
 
@@ -65,13 +65,13 @@ Gardez une liste d'exercices dans les Réglages (gainage, abdominaux, étirement
 
 Une pause longue est découpée en plusieurs parties, chacune aussi longue qu'une pause courte, et chaque partie a son propre exercice. Une pause longue de 20 minutes avec des pauses courtes de 5 minutes donne 4 parties et 4 exercices à la suite. Si la pause longue n'est pas un multiple de la pause courte, le reste va à la dernière partie. Un son est joué quand la pause passe à la partie suivante.
 
-![La pause longue](/img/screenshots/widget-long-break.png)
+![La pause longue](/img/screenshots/fr/widget-long-break.png)
 
 ## Mode minuteur
 
 Le mode minuteur sert pour le thé, les pâtes ou une tâche rapide. Il n'y a qu'un minuteur à la fois, il est affiché en ambre, et il n'alerte qu'une fois, à zéro. Les minuteurs ne sont pas enregistrés dans les statistiques.
 
-![Le minuteur](/img/screenshots/widget-countdown.png)
+![Le minuteur](/img/screenshots/fr/widget-countdown.png)
 
 Quand le minuteur n'est pas lancé, cliquez sur le temps pour saisir une nouvelle durée. Tapez des minutes (`10`) ou des minutes et des secondes (`1:30`), puis Entrée. Des choix rapides sont aussi proposés, `5`, `10`, `15` et `30` minutes par défaut, que vous pouvez changer dans les Réglages.
 
@@ -92,7 +92,7 @@ Pour chacun des quatre événements, vous choisissez ce qui se passe : une notif
 
 La superposition assombrit l'écran qui contient le widget et affiche la phase, le temps restant et l'exercice.
 
-![La superposition de pause](/img/screenshots/overlay-break.png)
+![La superposition de pause](/img/screenshots/fr/overlay-break.png)
 
 Pendant une pause, vous pouvez :
 
@@ -139,7 +139,7 @@ Tomatick remarque que l'ordinateur s'est mis en veille, mais il ne sait pas enco
 
 L'icône de graphique ouvre la fenêtre des statistiques. Elles ne concernent que le mode Pomodoro.
 
-![La fenêtre des statistiques](/img/screenshots/statistics.png)
+![La fenêtre des statistiques](/img/screenshots/fr/statistics.png)
 
 - **Aujourd'hui** montre vos pomodoros terminés, le temps de concentration et votre progression vers l'objectif quotidien (8 par défaut).
 - Les vues **jour, semaine et mois** affichent des graphiques en barres des pomodoros ou du temps de concentration, avec des boutons précédent et suivant.

@@ -7,7 +7,7 @@ sidebar_position: 3
 
 Ouvrez les réglages avec la roue dentée du widget ou depuis le menu de la zone de notification. Cliquez sur **Enregistrer** pour appliquer vos changements, ou sur **Annuler** pour les abandonner. Une valeur hors de la plage autorisée est refusée, avec un message qui donne la plage.
 
-![La fenêtre des réglages](/img/screenshots/settings.png)
+![La fenêtre des réglages](/img/screenshots/fr/settings.png)
 
 ## Cycle Pomodoro
 
@@ -40,7 +40,7 @@ Saisissez les durées en minutes (`10`) ou en minutes et secondes (`1:30`). Sép
 
 Un tableau permet de choisir, pour chacun des quatre événements, ce qui se passe.
 
-![Les réglages d'alertes](/img/screenshots/settings-alerts.png)
+![Les réglages d'alertes](/img/screenshots/fr/settings-alerts.png)
 
 | Option | Effet |
 |---|---|

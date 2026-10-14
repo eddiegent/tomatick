@@ -51,7 +51,7 @@ npm run build              # construire les deux langues
 
 Les pages en anglais sont dans `website/docs`, et celles en français dans `website/i18n/fr/docusaurus-plugin-content-docs/current`. Quand vous modifiez une page, modifiez les deux si vous le pouvez, et dites-le dans votre pull request si vous ne pouvez en faire qu'une.
 
-Les images sont dans `website/static/img/screenshots`. Elles sont générées à partir de l'interface avec des données d'exemple par `npm run docs:screenshots`, à lancer depuis la racine du dépôt. Pour en remplacer une par une vraie capture, enregistrez-la sous le même nom.
+Les images sont dans `website/static/img/screenshots` (anglais) et `website/static/img/screenshots/fr` (français). Elles sont générées à partir de l'interface avec des données d'exemple par `npm run docs:screenshots`, à lancer depuis la racine du dépôt. Pour en remplacer une par une vraie capture, enregistrez-la sous le même nom dans le même dossier.
 
 ## Pull requests
 

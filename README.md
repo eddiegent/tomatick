@@ -44,7 +44,7 @@ The documentation is at **[eddiegent.github.io/tomatick](https://eddiegent.githu
 
 The full specification is in [SPEC.md](SPEC.md). It covers the timer behavior, alerts, widget design, statistics, data model, architecture and build milestones.
 
-The images of the site are rendered from the interface with sample data, and are meant to be replaced with real captures: see `website/static/img/screenshots/README.md`.
+The images of the site are rendered from the interface with sample data, and are meant to be replaced with real captures: see `website/static/img/screenshots/README.md`, which also covers the French set.
 
 ## Development
 
