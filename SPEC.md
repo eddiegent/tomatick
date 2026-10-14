@@ -224,7 +224,7 @@ Break overlay actions:
 
 Countdown overlay: a "Time's up" message with **Dismiss** and **Restart**. No skip or extend.
 
-There is no strict mode. By default the overlay covers the display that holds the widget (assumption, see 20).
+There is no strict mode. By default the overlay covers the display that holds the widget (decided, see 20).
 
 ## 9. Widget
 
@@ -443,16 +443,16 @@ Docusaurus in `/website`, deployed to GitHub Pages by a GitHub Actions workflow,
 10. **i18n:** i18next wiring, English and French files, Rust-side translations.
 11. **Update check, packaging and docs:** release workflow, installers, Docusaurus site, Linux and Wayland testing, 0.1 release.
 
-## 20. Assumptions to confirm
+## 20. Decisions
 
-These were not explicitly decided in the design discussion and should be confirmed or changed:
+These points were not part of the first design discussion. They were proposed as assumptions and have all been confirmed.
 
-1. **Overlay display:** covers the display that holds the widget (alternative: all displays).
-2. **Global shortcut defaults:** the key combinations in 13.3.
-3. **Settings storage:** in the same SQLite file as the history.
-4. **Extend buttons:** +1 min and +5 min.
-5. **Sound extras:** volume slider and mute toggle are included, ticking is excluded.
-6. **Project name:** Tomatick. Availability checks are summarized in section 21.
+- **Overlay display:** covers the display that holds the widget, not all displays (section 8.4).
+- **Global shortcut defaults:** the key combinations in 13.3.
+- **Settings storage:** in the same SQLite file as the history (section 12).
+- **Extend buttons:** +1 min and +5 min (section 8.4).
+- **Sound extras:** volume slider and mute toggle are included, ticking is excluded (section 8.3).
+- **Project name:** Tomatick. Availability checks are summarized in section 21. The domain names have not been checked.
 
 Decided: only one mode is active at a time, and switching mode resets the timer of the mode being left (section 4).
 
