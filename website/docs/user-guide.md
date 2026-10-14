@@ -28,7 +28,7 @@ The color tells you what is going on, and a ring around the tomato shows how far
 
 ![Short break](/img/screenshots/widget-short-break.png)
 
-The small number near the bottom, such as `2/4`, is the position in the cycle. Pick a size in Settings: small (140 px), medium (200 px) or large (280 px). On the medium and large sizes, the exercise of a break is shown under the time. On the small size it is in the tooltip.
+The small number above the time, such as `2/4`, is the position in the cycle. Pick a size in Settings: small (140 px), medium (200 px) or large (280 px). On the medium and large sizes, the exercise of a break is shown under the time. On the small size it is in the tooltip.
 
 ### Buttons
 

@@ -111,6 +111,8 @@ export interface MockOptions {
   updateCheckError?: string;
   /** Query string to open the page with (the overlay reads it). */
   query?: string;
+  /** The break exercise list. */
+  exercises?: { name: string; amount: string }[];
 }
 
 export interface MockCall {
@@ -134,7 +136,7 @@ export async function openApp(page: Page, options: MockOptions = {}): Promise<vo
     const w = window as any;
     const state = {
       settings: opts.settings,
-      exercises: [{ name: "Plank", amount: "30 s" }],
+      exercises: opts.exercises ?? [{ name: "Plank", amount: "30 s" }],
       snapshot: opts.snapshot,
       status: opts.status,
       update: opts.update,
