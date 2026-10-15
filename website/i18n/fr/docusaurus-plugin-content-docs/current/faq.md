@@ -29,6 +29,10 @@ Vous utilisez probablement Wayland. Le premier plan, la position des fenêtres e
 
 Certains bureaux Linux, GNOME en particulier, masquent ces icônes sans une extension qui les prend en charge. Le widget et ses boutons continuent de fonctionner. Sur les autres systèmes, regardez dans la zone des icônes cachées de la barre des tâches.
 
+## J'ai lancé Tomatick deux fois
+
+Une seule copie fonctionne à la fois. Relancer Tomatick affiche le widget de la copie déjà ouverte et ne fait rien d'autre.
+
 ## J'ai verrouillé l'écran et le minuteur a continué
 
 Tomatick détecte que l'ordinateur s'est mis en veille, mais pas encore que l'écran a été verrouillé. Utilisez le bouton pause, ou laissez l'ordinateur se mettre en veille.

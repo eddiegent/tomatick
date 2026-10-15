@@ -969,7 +969,17 @@ fn build_engine(store: &Store) -> Engine<SystemClock> {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    tauri::Builder::default()
+    let builder = tauri::Builder::default();
+    // Registered first, as the plugin asks: a second launch (a double click on
+    // the shortcut, a second login entry) must not start another timer, tray
+    // icon and set of global shortcuts. It shows the running widget instead.
+    #[cfg(desktop)]
+    let builder = builder.plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+        bring_widget_to_front(app);
+        let snapshot = lock(&app.state::<SharedEngine>()).snapshot();
+        tray::refresh(app, &snapshot, widget_visible(app), current_language(app));
+    }));
+    builder
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_dialog::init())
