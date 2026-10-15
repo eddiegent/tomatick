@@ -358,6 +358,10 @@ Work even when another application has focus, and can be rebound in the configur
 
 The settings UI detects conflicts with an already registered shortcut and reports registration failures instead of failing silently.
 
+### 13.4 Single instance
+
+Only one copy of Tomatick runs per user. Starting it again (the shortcut, a second login entry) does not open a second timer, tray icon or set of global shortcuts: the running copy shows its widget and the new one exits.
+
 ## 14. Internationalization
 
 - All user-visible text goes through i18next. No hard-coded strings.

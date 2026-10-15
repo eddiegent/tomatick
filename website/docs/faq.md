@@ -29,6 +29,10 @@ You are probably running Wayland. Always-on-top, window position and global shor
 
 Some Linux desktops, GNOME in particular, hide tray icons unless an extension adds support for them. The widget and its buttons keep working. On other systems, check the hidden icons area of the taskbar.
 
+## I opened Tomatick twice
+
+Only one copy runs at a time. Starting it again shows the widget of the copy that is already running and does nothing else.
+
 ## I locked my screen and the timer kept running
 
 Tomatick detects that the computer went to sleep, but not yet that the screen was locked. Use the pause button, or let the computer sleep.
