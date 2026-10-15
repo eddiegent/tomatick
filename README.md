@@ -2,7 +2,7 @@
 
 A free, open source Pomodoro timer for Windows, macOS and Linux, built around a small always-on-top tomato widget.
 
-> **Status: first release in preparation.** Every feature of the first version is in place. The installers are published on the [releases page](https://github.com/eddiegent/tomatick/releases) once version 0.1.0 is tagged. The builds are not signed, so Windows and macOS warn on first launch. The [documentation](https://eddiegent.github.io/tomatick/) explains how to continue.
+> **Version 0.1.0 is out.** Download the installer for your system from the [latest release](https://github.com/eddiegent/tomatick/releases/latest). The builds are not signed, so Windows and macOS warn on first launch. The [installation guide](https://eddiegent.github.io/tomatick/docs/installation) explains how to continue.
 
 ## What it is
 
